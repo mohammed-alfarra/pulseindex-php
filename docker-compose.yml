@@ -1,0 +1,47 @@
+services:
+  pulseindex-engine:
+    build:
+      context: ../pulseindex-engine
+      dockerfile: Dockerfile
+    image: pulseindex-engine:dev
+    container_name: pulseindex_engine_sdk
+    ports:
+      - "50051:50051"
+      - "9090:9090"
+    environment:
+      RUST_LOG: info
+      SERVER_PORT: "50051"
+      METRICS_PORT: "9090"
+      SNAPSHOT_DIR: /app/snapshots
+      PULSEINDEX_API_KEYS: ${PULSEINDEX_API_KEYS:-dev-key}
+      PULSEINDEX_AUTH_DISABLED: ${PULSEINDEX_AUTH_DISABLED:-false}
+    volumes:
+      - engine_snapshots:/app/snapshots
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:9090/metrics | grep -q pulseindex_ || exit 1",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+      start_period: 20s
+
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pulseindex_php_sdk
+    working_dir: /app
+    volumes:
+      - ./:/app
+    environment:
+      PULSEINDEX_HOST: pulseindex-engine:50051
+      PULSEINDEX_API_KEY: ${PULSEINDEX_API_KEY:-dev-key}
+    depends_on:
+      pulseindex-engine:
+        condition: service_healthy
+
+volumes:
+  engine_snapshots:

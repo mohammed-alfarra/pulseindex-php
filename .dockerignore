@@ -1,0 +1,10 @@
+.git
+.github
+vendor
+.phpunit.cache
+.phpunit.result.cache
+.env
+snapshots
+docker-data
+*.md
+.DS_Store
