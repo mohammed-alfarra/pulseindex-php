@@ -1,5 +1,8 @@
 services:
+  # Optional local engine (when one is not already bound on :50051):
+  #   docker compose --profile engine up -d pulseindex-engine
   pulseindex-engine:
+    profiles: ["engine"]
     build:
       context: ../pulseindex-engine
       dockerfile: Dockerfile
@@ -36,12 +39,15 @@ services:
     working_dir: /app
     volumes:
       - ./:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
-      PULSEINDEX_HOST: pulseindex-engine:50051
+      # Default: engine published on the host (e.g. pulseindex_engine_prod).
+      # Override to pulseindex-engine:50051 when using --profile engine.
+      PULSEINDEX_HOST: ${PULSEINDEX_HOST:-host.docker.internal:50051}
       PULSEINDEX_API_KEY: ${PULSEINDEX_API_KEY:-dev-key}
-    depends_on:
-      pulseindex-engine:
-        condition: service_healthy
+    # Ensure vendor exists when the repo is bind-mounted over the image /app.
+    entrypoint: ["bash", "-lc", "test -x vendor/bin/phpunit || composer update --no-interaction --prefer-dist; exec \"$$@\"", "bash"]
 
 volumes:
   engine_snapshots:
