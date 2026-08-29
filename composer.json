@@ -16,8 +16,16 @@
         "google/protobuf": "^4.28"
     },
     "require-dev": {
-        "phpunit/phpunit": "^11.0",
-        "illuminate/support": "^11.0 || ^12.0"
+        "illuminate/database": "^11.0 || ^12.0",
+        "illuminate/pagination": "^11.0 || ^12.0",
+        "illuminate/support": "^11.0 || ^12.0",
+        "orchestra/testbench": "^9.0 || ^10.0",
+        "phpunit/phpunit": "^11.0"
+    },
+    "suggest": {
+        "illuminate/database": "Required to use the PulseSearchable Eloquent trait and hydrator",
+        "illuminate/pagination": "Required to use PulseQueryBuilder::paginate()",
+        "illuminate/support": "Required for the Laravel service provider and facade"
     },
     "autoload": {
         "psr-4": {

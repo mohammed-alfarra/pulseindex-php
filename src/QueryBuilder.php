@@ -8,6 +8,7 @@ use PulseIndex\Engine\V1\FilterPredicate;
 use PulseIndex\Engine\V1\FilterPredicate\Operation;
 use PulseIndex\Engine\V1\RangePredicate;
 use PulseIndex\Engine\V1\SearchQueryRequest;
+use PulseIndex\Geo\GeoHash;
 
 /**
  * Fluent builder for PulseIndex Search RPCs.
@@ -29,7 +30,7 @@ final class QueryBuilder
     private array $ranges = [];
 
     public function __construct(
-        private readonly ?Client $client = null,
+        private readonly ?ClientInterface $client = null,
     ) {
     }
 
@@ -62,6 +63,41 @@ final class QueryBuilder
     public function mustNot(string $attribute): self
     {
         return $this->filter(Operation::MUST_NOT, $attribute);
+    }
+
+    /**
+     * Exact GeoHash cell match: MUST `geo:{precision}:{hash}` bitwise tag.
+     */
+    public function whereGeoHash(string $geohash): self
+    {
+        return $this->must(GeoHash::tag($geohash));
+    }
+
+    /**
+     * Alias of {@see whereGeoHash()}.
+     */
+    public function inGeoHash(string $geohash): self
+    {
+        return $this->whereGeoHash($geohash);
+    }
+
+    /**
+     * Radius coverage as SHOULD `geo:{precision}:{hash}` tags for cells that
+     * intersect the circle (engine ORs the SHOULD group, then ANDs it in).
+     *
+     * When $precision is omitted, {@see GeoHash::optimalPrecisionForRadius()} is used.
+     */
+    public function withinRadius(float $lat, float $lon, float $radiusKm, ?int $precision = null): self
+    {
+        $clone = clone $this;
+        foreach (GeoHash::getCoveringHashes($lat, $lon, $radiusKm, $precision) as $hash) {
+            $clone->filters[] = [
+                'op' => Operation::SHOULD,
+                'attribute' => GeoHash::tag($hash),
+            ];
+        }
+
+        return $clone;
     }
 
     public function range(string $field, int $min, int $max): self

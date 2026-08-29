@@ -7,6 +7,7 @@ namespace PulseIndex\Tests\Unit;
 use PHPUnit\Framework\TestCase;
 use PulseIndex\Engine\V1\FilterPredicate\Operation;
 use PulseIndex\Entity;
+use PulseIndex\Geo\GeoHash;
 use PulseIndex\QueryBuilder;
 
 final class QueryBuilderTest extends TestCase
@@ -74,5 +75,66 @@ final class QueryBuilderTest extends TestCase
         self::assertSame(1200, $entity->price);
         self::assertSame(7, $entity->locationPrefix);
         self::assertSame('t1', $entity->tenantId);
+    }
+
+    public function testWhereGeoHashAddsMustGeoTag(): void
+    {
+        $request = (new QueryBuilder())
+            ->whereGeoHash('ezs42')
+            ->toRequest();
+
+        self::assertCount(1, $request->getFilters());
+        self::assertSame(Operation::MUST, $request->getFilters()[0]->getOp());
+        self::assertSame('geo:5:ezs42', $request->getFilters()[0]->getAttribute());
+    }
+
+    public function testInGeoHashIsAliasOfWhereGeoHash(): void
+    {
+        $viaWhere = (new QueryBuilder())->whereGeoHash('geo:5:ezs42')->toArray();
+        $viaIn = (new QueryBuilder())->inGeoHash('ezs42')->toArray();
+
+        self::assertSame($viaWhere['filters'], $viaIn['filters']);
+        self::assertSame(Operation::MUST, $viaIn['filters'][0]['op']);
+        self::assertSame('geo:5:ezs42', $viaIn['filters'][0]['attribute']);
+    }
+
+    public function testWithinRadiusAddsShouldGeoTagsForCoveringHashes(): void
+    {
+        $lat = 42.6;
+        $lon = -5.6;
+        $radiusKm = 4.9;
+        $covering = GeoHash::getCoveringHashes($lat, $lon, $radiusKm);
+
+        $base = new QueryBuilder();
+        $built = $base->withinRadius($lat, $lon, $radiusKm);
+        $request = $built->toRequest();
+
+        self::assertSame([], $base->toArray()['filters']);
+        self::assertCount(count($covering), $request->getFilters());
+        self::assertSame(5, GeoHash::optimalPrecisionForRadius($radiusKm));
+
+        $attributes = [];
+        foreach ($request->getFilters() as $filter) {
+            self::assertSame(Operation::SHOULD, $filter->getOp());
+            $attributes[] = $filter->getAttribute();
+        }
+
+        self::assertSame(array_map(GeoHash::tag(...), $covering), $attributes);
+        self::assertSame('geo:5:ezs42', $attributes[0]);
+        foreach ($attributes as $attribute) {
+            self::assertMatchesRegularExpression('/^geo:5:[0-9bcdefghjkmnpqrstuvwxyz]+$/', $attribute);
+        }
+    }
+
+    public function testWithinRadiusHonorsExplicitPrecision(): void
+    {
+        $lat = 42.6;
+        $lon = -5.6;
+        $covering = GeoHash::getCoveringHashes($lat, $lon, 1.0, 6);
+        $request = (new QueryBuilder())->withinRadius($lat, $lon, 1.0, 6)->toRequest();
+
+        self::assertCount(count($covering), $request->getFilters());
+        self::assertSame('geo:6:' . $covering[0], $request->getFilters()[0]->getAttribute());
+        self::assertSame(Operation::SHOULD, $request->getFilters()[0]->getOp());
     }
 }

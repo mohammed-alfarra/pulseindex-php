@@ -15,7 +15,7 @@ use PulseIndex\Exception\PulseIndexException;
 /**
  * Fluent PHP wrapper around the PulseIndex gRPC SearchEngineService.
  */
-final class Client
+final class Client implements ClientInterface
 {
     private SearchEngineServiceClient $stub;
 

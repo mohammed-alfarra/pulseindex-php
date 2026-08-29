@@ -6,6 +6,7 @@ namespace PulseIndex\Laravel;
 
 use Illuminate\Support\ServiceProvider;
 use PulseIndex\Client;
+use PulseIndex\ClientInterface;
 
 final class PulseIndexServiceProvider extends ServiceProvider
 {
@@ -16,14 +17,20 @@ final class PulseIndexServiceProvider extends ServiceProvider
         $this->app->singleton(Client::class, function ($app): Client {
             $config = $app['config']->get('pulseindex', []);
 
+            $timeoutUs = $config['timeout_us'] ?? null;
+            if ($timeoutUs === null || $timeoutUs === '') {
+                $timeoutUs = (int) round(((float) ($config['timeout'] ?? 5)) * 1_000_000);
+            }
+
             return new Client([
                 'host' => (string) ($config['host'] ?? 'localhost:50051'),
                 'api_key' => $config['api_key'] ?? null,
                 'ssl' => (bool) ($config['ssl'] ?? false),
-                'timeout_us' => (int) ($config['timeout_us'] ?? 5_000_000),
+                'timeout_us' => (int) $timeoutUs,
             ]);
         });
 
+        $this->app->bind(ClientInterface::class, fn ($app) => $app->make(Client::class));
         $this->app->alias(Client::class, 'pulseindex');
     }
 

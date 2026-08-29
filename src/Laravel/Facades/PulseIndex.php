@@ -7,6 +7,7 @@ namespace PulseIndex\Laravel\Facades;
 use Illuminate\Support\Facades\Facade;
 use PulseIndex\Client;
 use PulseIndex\Entity;
+use PulseIndex\Laravel\PulseQueryBuilder;
 use PulseIndex\QueryBuilder;
 use PulseIndex\SearchResult;
 
@@ -19,6 +20,7 @@ use PulseIndex\SearchResult;
  * @method static SearchResult search(QueryBuilder $query)
  *
  * @see Client
+ * @see PulseQueryBuilder
  */
 final class PulseIndex extends Facade
 {
