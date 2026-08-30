@@ -152,6 +152,57 @@ final class Outbox
     }
 
     /**
+     * Age in seconds of the oldest pending (not failed) marker, or null if none.
+     *
+     * @param list<string|null> $connections
+     */
+    public static function oldestPendingSeconds(array $connections): ?int
+    {
+        $oldest = null;
+        foreach ($connections === [] ? [null] : $connections as $connection) {
+            $min = DB::connection($connection)->table(self::table())
+                ->whereNull('failed_at')
+                ->min('created_at');
+            if ($min === null) {
+                continue;
+            }
+            $ts = Carbon::parse($min);
+            if ($oldest === null || $ts->lessThan($oldest)) {
+                $oldest = $ts;
+            }
+        }
+
+        return $oldest === null ? null : max(0, (int) $oldest->diffInSeconds(Carbon::now(), true));
+    }
+
+    /**
+     * The most recent `last_error` recorded on any marker, or null.
+     *
+     * @param list<string|null> $connections
+     */
+    public static function latestError(array $connections): ?string
+    {
+        $latest = null;
+        $latestAt = null;
+        foreach ($connections === [] ? [null] : $connections as $connection) {
+            $row = DB::connection($connection)->table(self::table())
+                ->whereNotNull('last_error')
+                ->orderByDesc('updated_at')
+                ->first(['last_error', 'updated_at']);
+            if ($row === null) {
+                continue;
+            }
+            $at = Carbon::parse($row->updated_at);
+            if ($latestAt === null || $at->greaterThan($latestAt)) {
+                $latestAt = $at;
+                $latest = (string) $row->last_error;
+            }
+        }
+
+        return $latest;
+    }
+
+    /**
      * @param list<string|null> $connections
      */
     private static function countAcross(array $connections, bool $failed): int

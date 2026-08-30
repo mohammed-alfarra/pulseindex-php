@@ -143,4 +143,19 @@ return [
         'max_orphan_ratio' => (float) env('PULSEINDEX_RECONCILE_MAX_ORPHAN_RATIO', 0.25),
         'pending_threshold' => (int) env('PULSEINDEX_RECONCILE_PENDING_THRESHOLD', 1_000),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Health thresholds
+    |--------------------------------------------------------------------------
+    |
+    | `php artisan pulse:health` exits non-zero (for monitoring) when any of
+    | these are exceeded. Read-only — it reports, it never fixes.
+    |
+    */
+    'health' => [
+        'max_pending' => (int) env('PULSEINDEX_HEALTH_MAX_PENDING', 10_000),
+        'max_failed' => (int) env('PULSEINDEX_HEALTH_MAX_FAILED', 0),
+        'max_lag_seconds' => (int) env('PULSEINDEX_HEALTH_MAX_LAG', 300),
+    ],
 ];

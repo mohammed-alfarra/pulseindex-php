@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Best effort: enables the engine-diff half of check:proto. The offline
+      # hash check runs regardless. Requires an ENGINE_REPO_TOKEN secret with
+      # read access to the engine repo.
+      - name: Check out engine proto
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          repository: mohammed-alfarra/PulseIndex
+          path: pulseindex-engine-src
+          token: ${{ secrets.ENGINE_REPO_TOKEN }}
+
+      - name: Locate engine proto
+        run: |
+          if [ -f pulseindex-engine-src/proto/engine.proto ]; then
+            echo "PULSEINDEX_PROTO=$GITHUB_WORKSPACE/pulseindex-engine-src/proto/engine.proto" >> "$GITHUB_ENV"
+          fi
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: grpc
+          tools: composer
+
+      - run: composer update --no-interaction --prefer-dist
+
+      - name: Proto drift guard
+        run: composer check:proto
+
+      - name: Unit tests
+        run: vendor/bin/phpunit --testsuite Unit

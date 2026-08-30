@@ -8,6 +8,7 @@ use Illuminate\Support\ServiceProvider;
 use PulseIndex\AdminHttpClient;
 use PulseIndex\Client;
 use PulseIndex\ClientInterface;
+use PulseIndex\Laravel\Commands\HealthCommand;
 use PulseIndex\Laravel\Commands\OutboxWorkCommand;
 use PulseIndex\Laravel\Commands\ReconcileCommand;
 use PulseIndex\Laravel\Commands\ReindexCommand;
@@ -63,7 +64,12 @@ final class PulseIndexServiceProvider extends ServiceProvider
                 __DIR__ . '/../../database/migrations' => $this->app->databasePath('migrations'),
             ], 'pulseindex-migrations');
 
-            $this->commands([ReindexCommand::class, OutboxWorkCommand::class, ReconcileCommand::class]);
+            $this->commands([
+                ReindexCommand::class,
+                OutboxWorkCommand::class,
+                ReconcileCommand::class,
+                HealthCommand::class,
+            ]);
         }
     }
 }

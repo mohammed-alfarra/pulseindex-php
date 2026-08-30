@@ -218,4 +218,10 @@ class SearchEngineServiceClient extends \Grpc\BaseStub
 PHP
 fi
 
+# Record a normalised hash so scripts/check-proto.sh can detect hand-edits to the
+# vendored proto that were not produced by this script.
+grep -vE '^[[:space:]]*(option php_|$)' "${PROTO_FILE}" | shasum -a 256 | awk '{print $1}' \
+  > "${PROTO_DIR}/engine.proto.sha256"
+
 echo "Proto compile complete → ${OUT_DIR}"
+echo "Baseline hash → ${PROTO_DIR}/engine.proto.sha256"

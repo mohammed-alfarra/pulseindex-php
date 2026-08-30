@@ -51,6 +51,7 @@
     },
     "scripts": {
         "build-proto": "bash scripts/compile-proto.sh",
+        "check:proto": "bash scripts/check-proto.sh",
         "test": "phpunit",
         "test:unit": "phpunit --testsuite Unit",
         "test:integration": "phpunit --testsuite Integration"

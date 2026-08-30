@@ -188,6 +188,42 @@ but keep in the DB as orphans and enqueues deletes for them.
 
 ---
 
+## Monitoring — `pulse:health`
+
+Read-only probe (it reports, never fixes). Exits non-zero when a threshold trips, so a
+cron / uptime check can alert.
+
+```bash
+php artisan pulse:health          # human summary + exit code
+php artisan pulse:health --json   # { healthy, engine:{...}, outbox:{pending,failed,oldest_pending_seconds,latest_error}, checks:[...] }
+```
+
+```php
+$schedule->command('pulse:health')->everyFiveMinutes();   // + alert on non-zero exit
+```
+
+| env | default | unhealthy when |
+|---|---|---|
+| `PULSEINDEX_HEALTH_MAX_FAILED` | `0` | outbox `failed_at` rows exceed this |
+| `PULSEINDEX_HEALTH_MAX_PENDING` | `10000` | outbox backlog exceeds this |
+| `PULSEINDEX_HEALTH_MAX_LAG` | `300` | oldest pending marker is older than this (seconds) |
+
+Also unhealthy: engine unreachable, or `needs_full_reindex`.
+
+## Keeping the proto in sync
+
+The SDK vendors `proto/engine.proto`. `composer check:proto` guards it:
+
+- **offline** — the vendored proto still matches `proto/engine.proto.sha256` (i.e. it was
+  produced by `composer build-proto`, not hand-edited). Always runs.
+- **against the engine** — when `PULSEINDEX_PROTO` points at the engine's proto, or
+  `../pulseindex-engine` is checked out, a full diff. Skipped otherwise.
+
+CI runs `check:proto` on every PHP version; regenerate with `composer build-proto` (which
+rewrites the hash) and commit whenever the engine's contract changes.
+
+---
+
 ## PHP client
 
 ```php
