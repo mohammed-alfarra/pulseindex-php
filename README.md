@@ -79,6 +79,42 @@ $page = Property::pulseSearch()->paginate(15);
 
 ---
 
+## Bootstrapping & recovery — `pulse:reindex`
+
+The engine is a **push-sink**: the `PulseSearchable` observer only syncs *future* saves, so
+existing rows are never indexed until you run a rebuild.
+
+```bash
+# Initial import of one model (works against any engine state)
+php artisan pulse:reindex "App\Models\Property"
+
+# Rebuild every configured model
+php artisan pulse:reindex
+
+# After a needs_full_reindex alert (total snapshot loss on the engine):
+#   rebuilds every model, then POSTs /recovery/reindex-complete to clear the flag
+php artisan pulse:reindex --recovery
+```
+
+`config/pulseindex.php`:
+
+| key | env | purpose |
+|---|---|---|
+| `searchable_models` | — | FQCNs to rebuild in no-arg / `--recovery` mode |
+| `admin_url` | `PULSEINDEX_ADMIN_URL` | engine admin base URL; derived from `host` + `admin_port` if unset |
+| `admin_port` | `PULSEINDEX_ADMIN_PORT` | default `8081` |
+| `internal_token` | `PULSEINDEX_ENGINE_INTERNAL_TOKEN` | required for `--recovery` to call `reindex-complete` |
+
+`--recovery` aborts if the engine reports `needs_full_reindex == false`, and any failed
+batch aborts the whole run **without** clearing the flag.
+
+> ⚠️ `pulse:reindex` is **not atomic with concurrent writes**. It disables the observer for
+> the whole run, so a row changed mid-scan can be pushed in its pre-change state, leaving
+> that entity stale. Until the outbox lands, run it during a quiet window. See
+> [`pulseindex-engine/docs/ingestion-recovery.md`](../pulseindex-engine/docs/ingestion-recovery.md).
+
+---
+
 ## PHP client
 
 ```php

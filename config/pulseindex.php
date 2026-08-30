@@ -71,4 +71,31 @@ return [
     |--------------------------------------------------------------------------
     */
     'tenant_id' => env('PULSEINDEX_TENANT_ID', ''),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Admin HTTP endpoint
+    |--------------------------------------------------------------------------
+    |
+    | The engine's admin port (health/ready/recovery), separate from the gRPC
+    | port. Used by `php artisan pulse:reindex --recovery` to POST
+    | /recovery/reindex-complete. When admin_url is null it is derived from
+    | `host` by replacing the port with `admin_port`.
+    |
+    */
+    'admin_url' => env('PULSEINDEX_ADMIN_URL'),
+    'admin_port' => (int) env('PULSEINDEX_ADMIN_PORT', 8081),
+    'internal_token' => env('PULSEINDEX_ENGINE_INTERNAL_TOKEN'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Searchable models
+    |--------------------------------------------------------------------------
+    |
+    | Fully-qualified model classes using the PulseSearchable trait. Used by
+    | `php artisan pulse:reindex` with no argument, and required for
+    | `pulse:reindex --recovery` (which rebuilds the whole index).
+    |
+    */
+    'searchable_models' => [],
 ];
