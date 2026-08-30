@@ -12,17 +12,19 @@ use Orchestra\Testbench\TestCase;
 use PulseIndex\Client;
 use PulseIndex\ClientInterface;
 use PulseIndex\Engine\V1\FilterPredicate\Operation;
-use PulseIndex\Entity;
 use PulseIndex\Exception\GrpcException;
 use PulseIndex\Geo\GeoHash;
 use PulseIndex\Laravel\PulseIndexServiceProvider;
 use PulseIndex\Laravel\PulseQueryBuilder;
 use PulseIndex\QueryBuilder;
 use PulseIndex\SearchResult;
+use PulseIndex\Tests\Concerns\CreatesOutboxTable;
 use PulseIndex\Tests\Fixtures\Property;
 
 final class PulseSearchableTest extends TestCase
 {
+    use CreatesOutboxTable;
+
     protected function getPackageProviders($app): array
     {
         return [PulseIndexServiceProvider::class];
@@ -54,15 +56,26 @@ final class PulseSearchableTest extends TestCase
             $table->float('longitude')->nullable();
             $table->timestamps();
         });
+        $this->createOutboxTable();
     }
 
     protected function setUp(): void
     {
         parent::setUp();
 
+        config()->set('pulseindex.outbox.dispatch', false);
+
         $client = $this->createMock(ClientInterface::class);
         $this->app->instance(ClientInterface::class, $client);
         $this->app->instance(Client::class, $client);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    private function outboxRows(): \Illuminate\Support\Collection
+    {
+        return \Illuminate\Support\Facades\DB::table('pulseindex_outbox')->get();
     }
 
     public function testPulseSearchReturnsQueryBuilder(): void
@@ -72,54 +85,41 @@ final class PulseSearchableTest extends TestCase
         self::assertInstanceOf(PulseQueryBuilder::class, $builder);
     }
 
-    public function testCreatedObserverIndexesEntity(): void
+    public function testCreatedObserverEnqueuesAnOutboxMarker(): void
     {
-        $client = $this->createMock(ClientInterface::class);
-        $client->expects(self::once())
-            ->method('index')
-            ->with(self::callback(function (Entity $entity): bool {
-                return $entity->entityId === 1
-                    && $entity->price === 1500
-                    && $entity->tenantId === 'acme'
-                    && in_array('feature:pool', $entity->categories, true)
-                    && in_array('status:open', $entity->categories, true);
-            }))
-            ->willReturn(true);
-        $this->app->instance(ClientInterface::class, $client);
-        $this->app->instance(Client::class, $client);
-
         $property = Property::query()->create([
             'status' => 'open',
             'price' => 1500,
             'tags' => ['feature:pool'],
-            'latitude' => 42.6,
-            'longitude' => -5.6,
         ]);
 
-        self::assertSame(1, $property->id);
-        self::assertContains('geo:5:ezs42', $property->toPulseEntity()->categories);
-        self::assertContains(GeoHash::encodeTag(42.6, -5.6, 6), $property->toPulseEntity()->categories);
+        $rows = $this->outboxRows();
+        self::assertCount(1, $rows);
+        self::assertSame(Property::class, $rows[0]->model_type);
+        self::assertSame((string) $property->id, $rows[0]->model_key);
+        self::assertSame((int) $property->id, (int) $rows[0]->entity_id);
+        self::assertSame('acme', $rows[0]->tenant_id);
+        self::assertSame('upsert', $rows[0]->operation);
     }
 
-    public function testUpdatedAndDeletedObserversSyncIndex(): void
+    public function testRepeatedChangesCoalesceIntoOneMarker(): void
     {
-        $client = $this->createMock(ClientInterface::class);
-        $client->expects(self::exactly(2))
-            ->method('index')
-            ->willReturn(true);
-        $client->expects(self::once())
-            ->method('deleteEntity')
-            ->with(1, 'acme')
-            ->willReturn(true);
-        $this->app->instance(ClientInterface::class, $client);
-        $this->app->instance(Client::class, $client);
-
-        $property = Property::query()->create([
-            'status' => 'open',
-            'price' => 100,
-        ]);
+        $property = Property::query()->create(['status' => 'open', 'price' => 100]);
         $property->update(['price' => 200]);
+        $property->update(['price' => 300]);
+
+        $rows = $this->outboxRows();
+        self::assertCount(1, $rows);
+        self::assertSame('upsert', $rows[0]->operation);
+        self::assertGreaterThanOrEqual(2, (int) $rows[0]->revision);
+        self::assertSame(0, (int) $rows[0]->attempts);
+
         $property->delete();
+
+        $rows = $this->outboxRows();
+        self::assertCount(1, $rows);
+        self::assertSame('delete', $rows[0]->operation);
+        self::assertSame((int) $property->id, (int) $rows[0]->entity_id);
     }
 
     public function testHydrationPreservesPulseRankOrder(): void
@@ -267,13 +267,8 @@ final class PulseSearchableTest extends TestCase
         self::assertTrue(config('pulseindex.fallback_enabled'));
     }
 
-    public function testWithoutSyncingToPulseSkipsObservers(): void
+    public function testWithoutSyncingToPulseSkipsTheOutbox(): void
     {
-        $client = $this->createMock(ClientInterface::class);
-        $client->expects(self::never())->method('index');
-        $this->app->instance(ClientInterface::class, $client);
-        $this->app->instance(Client::class, $client);
-
         Property::withoutSyncingToPulse(function (): void {
             Property::query()->create([
                 'status' => 'open',
@@ -282,6 +277,7 @@ final class PulseSearchableTest extends TestCase
         });
 
         self::assertSame(1, Property::query()->count());
+        self::assertCount(0, $this->outboxRows());
     }
 
     private function seedProperties(): void

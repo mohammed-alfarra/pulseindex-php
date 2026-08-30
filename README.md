@@ -79,39 +79,76 @@ $page = Property::pulseSearch()->paginate(15);
 
 ---
 
-## Bootstrapping & recovery — `pulse:reindex`
+## Sync: durable outbox
 
-The engine is a **push-sink**: the `PulseSearchable` observer only syncs *future* saves, so
-existing rows are never indexed until you run a rebuild.
+Every `PulseSearchable` model change (create / update / delete / restore) writes a **marker
+row** to `pulseindex_outbox` — on the model's own connection, inside the same transaction —
+and a worker drains markers into the engine with retry. A brief engine outage never loses a
+change; repeated edits to one row coalesce and the worker pushes its **current** state.
+
+Publish + run the migration on every connection that has searchable models:
 
 ```bash
-# Initial import of one model (works against any engine state)
+php artisan vendor:publish --tag=pulseindex-migrations
+php artisan migrate
+```
+
+Drain the outbox — schedule the safety-net pass and/or run a daemon:
+
+```php
+// app/Console/Kernel.php  (or routes/console.php on Laravel 11+)
+$schedule->command('pulse:outbox:work --once')->everyMinute()->withoutOverlapping();
+```
+
+```bash
+# long-running worker (Supervisor / Horizon), like queue:work
+php artisan pulse:outbox:work
+```
+
+When `outbox.dispatch` is `true` (default) each change also dispatches a `DrainOutboxJob`
+for low latency; the scheduled `--once` pass covers a dead queue or a failed job.
+
+| env | default | purpose |
+|---|---|---|
+| `PULSEINDEX_OUTBOX_CONNECTIONS` | `DB_CONNECTION` | comma list of connections the worker drains |
+| `PULSEINDEX_OUTBOX_DISPATCH` | `true` | also queue a drain job on each change |
+| `PULSEINDEX_OUTBOX_QUEUE` | `default` | queue for `DrainOutboxJob` |
+| `PULSEINDEX_OUTBOX_LEASE` | `300` | seconds a claimed marker is hidden from other workers |
+| `PULSEINDEX_OUTBOX_MAX_ATTEMPTS` | `12` | after this many failed pushes a marker is parked (`failed_at`) |
+
+---
+
+## Bootstrapping & recovery — `pulse:reindex`
+
+The observer only syncs *future* saves, so existing rows need one rebuild. `pulse:reindex`
+enqueues a marker per row and drains through the same worker — **safe to run while the app
+keeps writing**; concurrent changes coalesce, nothing is lost.
+
+```bash
+# Initial import of one model
 php artisan pulse:reindex "App\Models\Property"
 
 # Rebuild every configured model
 php artisan pulse:reindex
 
 # After a needs_full_reindex alert (total snapshot loss on the engine):
-#   rebuilds every model, then POSTs /recovery/reindex-complete to clear the flag
+#   rebuilds every model, drains, then POSTs /recovery/reindex-complete
 php artisan pulse:reindex --recovery
-```
 
-`config/pulseindex.php`:
+# enqueue only; let pulse:outbox:work drain
+php artisan pulse:reindex --async
+```
 
 | key | env | purpose |
 |---|---|---|
-| `searchable_models` | — | FQCNs to rebuild in no-arg / `--recovery` mode |
+| `searchable_models` | — | FQCNs for no-arg / `--recovery` mode |
 | `admin_url` | `PULSEINDEX_ADMIN_URL` | engine admin base URL; derived from `host` + `admin_port` if unset |
 | `admin_port` | `PULSEINDEX_ADMIN_PORT` | default `8081` |
-| `internal_token` | `PULSEINDEX_ENGINE_INTERNAL_TOKEN` | required for `--recovery` to call `reindex-complete` |
+| `internal_token` | `PULSEINDEX_ENGINE_INTERNAL_TOKEN` | required for `--recovery` |
 
-`--recovery` aborts if the engine reports `needs_full_reindex == false`, and any failed
-batch aborts the whole run **without** clearing the flag.
-
-> ⚠️ `pulse:reindex` is **not atomic with concurrent writes**. It disables the observer for
-> the whole run, so a row changed mid-scan can be pushed in its pre-change state, leaving
-> that entity stale. Until the outbox lands, run it during a quiet window. See
-> [`pulseindex-engine/docs/ingestion-recovery.md`](../pulseindex-engine/docs/ingestion-recovery.md).
+`--recovery` aborts if the engine reports `needs_full_reindex == false`, or if any marker
+lands in `failed_at` — **without** clearing the flag. See
+[`pulseindex-engine/docs/ingestion-recovery.md`](../pulseindex-engine/docs/ingestion-recovery.md).
 
 ---
 

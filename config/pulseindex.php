@@ -98,4 +98,29 @@ return [
     |
     */
     'searchable_models' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Durable outbox
+    |--------------------------------------------------------------------------
+    |
+    | Every model change is written as a marker row (on the model's own
+    | connection, in its transaction) and drained by a worker with retry, so a
+    | change is never lost when the engine is briefly unreachable.
+    |
+    | Run the migration on every connection listed here, and schedule
+    | `php artisan pulse:outbox:work --once` (or run it as a daemon).
+    |
+    */
+    'outbox' => [
+        'connections' => array_values(array_filter(array_map('trim', explode(
+            ',',
+            (string) env('PULSEINDEX_OUTBOX_CONNECTIONS', (string) env('DB_CONNECTION', 'mysql')),
+        )))),
+        'table' => 'pulseindex_outbox',
+        'dispatch' => filter_var(env('PULSEINDEX_OUTBOX_DISPATCH', true), FILTER_VALIDATE_BOOLEAN),
+        'queue' => env('PULSEINDEX_OUTBOX_QUEUE', 'default'),
+        'lease_seconds' => (int) env('PULSEINDEX_OUTBOX_LEASE', 300),
+        'max_attempts' => (int) env('PULSEINDEX_OUTBOX_MAX_ATTEMPTS', 12),
+    ],
 ];

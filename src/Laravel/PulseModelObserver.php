@@ -5,52 +5,55 @@ declare(strict_types=1);
 namespace PulseIndex\Laravel;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Log;
+use PulseIndex\Laravel\Jobs\DrainOutboxJob;
 
 /**
- * Keeps PulseIndex in sync with Eloquent lifecycle events.
+ * Records every Eloquent lifecycle change as a durable {@see Outbox} marker.
+ *
+ * The marker is written on the model's own connection, inside the same
+ * transaction as the model write — so a change is never lost, even if the
+ * engine is unreachable at the time. A worker drains markers with retry.
  */
 final class PulseModelObserver
 {
     public function created(Model $model): void
     {
-        $this->safely($model, static fn () => $model->pulseIndex());
+        $this->enqueue($model, 'upsert');
     }
 
     public function updated(Model $model): void
     {
-        $this->safely($model, static fn () => $model->pulseIndex());
-    }
-
-    public function deleted(Model $model): void
-    {
-        $this->safely($model, static fn () => $model->pulseUnindex());
+        $this->enqueue($model, 'upsert');
     }
 
     public function restored(Model $model): void
     {
-        $this->safely($model, static fn () => $model->pulseIndex());
+        $this->enqueue($model, 'upsert');
+    }
+
+    public function deleted(Model $model): void
+    {
+        $this->enqueue($model, 'delete');
     }
 
     public function forceDeleted(Model $model): void
     {
-        $this->safely($model, static fn () => $model->pulseUnindex());
+        $this->enqueue($model, 'delete');
     }
 
-    private function safely(Model $model, callable $action): void
+    /**
+     * @param 'upsert'|'delete' $operation
+     */
+    private function enqueue(Model $model, string $operation): void
     {
         if (!PulseSync::enabled()) {
             return;
         }
 
-        try {
-            $action();
-        } catch (\Throwable $e) {
-            Log::warning('PulseIndex model sync failed.', [
-                'model' => $model::class,
-                'id' => $model->getKey(),
-                'message' => $e->getMessage(),
-            ]);
+        Outbox::mark($model, $operation);
+
+        if ((bool) config('pulseindex.outbox.dispatch', true)) {
+            DrainOutboxJob::dispatch()->afterCommit();
         }
     }
 }

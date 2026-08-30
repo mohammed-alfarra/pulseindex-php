@@ -8,6 +8,7 @@ use Illuminate\Support\ServiceProvider;
 use PulseIndex\AdminHttpClient;
 use PulseIndex\Client;
 use PulseIndex\ClientInterface;
+use PulseIndex\Laravel\Commands\OutboxWorkCommand;
 use PulseIndex\Laravel\Commands\ReindexCommand;
 
 final class PulseIndexServiceProvider extends ServiceProvider
@@ -49,12 +50,18 @@ final class PulseIndexServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__ . '/../../config/pulseindex.php' => $this->app->configPath('pulseindex.php'),
             ], 'pulseindex-config');
 
-            $this->commands([ReindexCommand::class]);
+            $this->publishesMigrations([
+                __DIR__ . '/../../database/migrations' => $this->app->databasePath('migrations'),
+            ], 'pulseindex-migrations');
+
+            $this->commands([ReindexCommand::class, OutboxWorkCommand::class]);
         }
     }
 }

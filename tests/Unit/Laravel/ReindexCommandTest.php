@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PulseIndex\Tests\Unit\Laravel;
 
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase;
 use PulseIndex\AdminHttpClient;
@@ -14,11 +15,14 @@ use PulseIndex\Exception\PulseIndexException;
 use PulseIndex\Laravel\PulseIndexServiceProvider;
 use PulseIndex\Laravel\PulseSync;
 use PulseIndex\RecoveryState;
+use PulseIndex\Tests\Concerns\CreatesOutboxTable;
 use PulseIndex\Tests\Fixtures\Property;
 use RuntimeException;
 
 final class ReindexCommandTest extends TestCase
 {
+    use CreatesOutboxTable;
+
     protected function getPackageProviders($app): array
     {
         return [PulseIndexServiceProvider::class];
@@ -28,12 +32,12 @@ final class ReindexCommandTest extends TestCase
     {
         $app['config']->set('database.default', 'testing');
         $app['config']->set('database.connections.testing', [
-            'driver' => 'sqlite',
-            'database' => ':memory:',
-            'prefix' => '',
+            'driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '',
         ]);
         $app['config']->set('pulseindex.tenant_id', 'acme');
         $app['config']->set('pulseindex.searchable_models', [Property::class]);
+        $app['config']->set('pulseindex.outbox.dispatch', false);
+        $app['config']->set('pulseindex.outbox.connections', ['testing']);
     }
 
     protected function defineDatabaseMigrations(): void
@@ -47,12 +51,11 @@ final class ReindexCommandTest extends TestCase
             $table->float('longitude')->nullable();
             $table->timestamps();
         });
+        $this->createOutboxTable();
     }
 
     private function fakeClient(): ClientInterface
     {
-        // Real client would open a gRPC channel in setUp via the observer; keep the
-        // observer inert by binding a no-op double up front.
         $client = $this->createMock(ClientInterface::class);
         $this->app->instance(ClientInterface::class, $client);
         $this->app->instance(Client::class, $client);
@@ -68,6 +71,14 @@ final class ReindexCommandTest extends TestCase
         return $admin;
     }
 
+    private function state(bool $needsFullReindex): RecoveryState
+    {
+        return new RecoveryState(
+            lastCdcOffset: 0, indexedCount: 0, chunkCount: 0,
+            mutationsSinceSnapshot: 0, needsFullReindex: $needsFullReindex,
+        );
+    }
+
     private function makeRows(int $n): void
     {
         PulseSync::withoutSyncing(function () use ($n): void {
@@ -77,17 +88,17 @@ final class ReindexCommandTest extends TestCase
         });
     }
 
-    public function test_bootstrap_indexes_all_rows_without_touching_recovery(): void
+    public function test_bootstrap_enqueues_and_drains_without_touching_recovery(): void
     {
         $this->makeRows(3);
         $client = $this->fakeClient();
         $admin = $this->fakeAdmin();
 
         $seen = 0;
-        $client->method('batchIndex')->willReturnCallback(function (array $entities) use (&$seen): int {
-            $seen += count($entities);
+        $client->method('batchIndex')->willReturnCallback(function (array $e) use (&$seen): int {
+            $seen += count($e);
 
-            return count($entities);
+            return count($e);
         });
         $client->expects(self::never())->method('getRecoveryState');
         $admin->expects(self::never())->method('markReindexComplete');
@@ -95,17 +106,28 @@ final class ReindexCommandTest extends TestCase
         $this->artisan('pulse:reindex', ['model' => Property::class])->assertExitCode(0);
 
         self::assertSame(3, $seen);
+        self::assertSame(0, DB::table('pulseindex_outbox')->count());
     }
 
-    public function test_recovery_reindexes_then_marks_complete(): void
+    public function test_async_only_enqueues(): void
+    {
+        $this->makeRows(2);
+        $client = $this->fakeClient();
+        $this->fakeAdmin();
+        $client->expects(self::never())->method('batchIndex');
+
+        $this->artisan('pulse:reindex', ['model' => Property::class, '--async' => true])->assertExitCode(0);
+
+        self::assertSame(2, DB::table('pulseindex_outbox')->count());
+    }
+
+    public function test_recovery_drains_then_marks_complete(): void
     {
         $this->makeRows(2);
         $client = $this->fakeClient();
         $admin = $this->fakeAdmin();
 
-        $client->method('getRecoveryState')->willReturn(
-            new RecoveryState(lastCdcOffset: 0, indexedCount: 0, chunkCount: 0, mutationsSinceSnapshot: 0, needsFullReindex: true),
-        );
+        $client->method('getRecoveryState')->willReturn($this->state(true));
         $client->expects(self::atLeastOnce())->method('batchIndex')->willReturn(2);
         $admin->expects(self::once())->method('markReindexComplete');
 
@@ -118,9 +140,7 @@ final class ReindexCommandTest extends TestCase
         $client = $this->fakeClient();
         $admin = $this->fakeAdmin();
 
-        $client->method('getRecoveryState')->willReturn(
-            new RecoveryState(lastCdcOffset: 0, indexedCount: 5, chunkCount: 1, mutationsSinceSnapshot: 0, needsFullReindex: false),
-        );
+        $client->method('getRecoveryState')->willReturn($this->state(false));
         $client->expects(self::never())->method('batchIndex');
         $admin->expects(self::never())->method('markReindexComplete');
 
@@ -137,21 +157,22 @@ final class ReindexCommandTest extends TestCase
         $this->artisan('pulse:reindex', ['model' => Property::class, '--recovery' => true])->assertFailed();
     }
 
-    public function test_batch_failure_aborts_without_marking_complete(): void
+    public function test_drain_failure_aborts_without_marking_complete(): void
     {
-        $this->makeRows(5);
+        config()->set('pulseindex.outbox.max_attempts', 1);
+        $this->makeRows(3);
         $client = $this->fakeClient();
         $admin = $this->fakeAdmin();
 
-        $client->method('getRecoveryState')->willReturn(
-            new RecoveryState(lastCdcOffset: 0, indexedCount: 0, chunkCount: 0, mutationsSinceSnapshot: 0, needsFullReindex: true),
-        );
+        $client->method('getRecoveryState')->willReturn($this->state(true));
         $client->method('batchIndex')->willThrowException(new RuntimeException('engine RESOURCE_EXHAUSTED'));
         $admin->expects(self::never())->method('markReindexComplete');
 
-        $this->artisan('pulse:reindex', ['--recovery' => true, '--chunk' => 2])
-            ->expectsOutputToContain('chunk 1')
+        $this->artisan('pulse:reindex', ['--recovery' => true])
+            ->expectsOutputToContain('did not drain cleanly')
             ->assertFailed();
+
+        self::assertGreaterThan(0, DB::table('pulseindex_outbox')->whereNotNull('failed_at')->count());
     }
 
     public function test_completion_call_failure_is_reported_as_failure(): void
@@ -160,9 +181,7 @@ final class ReindexCommandTest extends TestCase
         $client = $this->fakeClient();
         $admin = $this->fakeAdmin();
 
-        $client->method('getRecoveryState')->willReturn(
-            new RecoveryState(lastCdcOffset: 0, indexedCount: 0, chunkCount: 0, mutationsSinceSnapshot: 0, needsFullReindex: true),
-        );
+        $client->method('getRecoveryState')->willReturn($this->state(true));
         $client->method('batchIndex')->willReturn(2);
         $admin->method('markReindexComplete')->willThrowException(
             new PulseIndexException('engine reports the index is still empty; nothing was indexed'),
@@ -173,21 +192,26 @@ final class ReindexCommandTest extends TestCase
             ->assertFailed();
     }
 
-    public function test_observer_is_disabled_during_the_run(): void
+    public function test_concurrent_write_during_reindex_is_not_lost(): void
     {
-        $this->makeRows(1);
+        $p = PulseSync::withoutSyncing(fn () => Property::query()->create(['status' => 'open', 'price' => 100]));
         $client = $this->fakeClient();
         $this->fakeAdmin();
 
-        $enabledDuringRun = true;
-        $client->method('batchIndex')->willReturnCallback(function (array $entities) use (&$enabledDuringRun): int {
-            $enabledDuringRun = PulseSync::enabled();
+        $pushed = [];
+        $client->method('batchIndex')->willReturnCallback(function (array $e) use (&$pushed, $p): int {
+            $pushed[] = $e[0]->price;
+            if (count($pushed) === 1) {
+                PulseSync::withoutSyncing(fn () => $p->update(['price' => 777]));
+                \PulseIndex\Laravel\Outbox::mark($p->refresh(), 'upsert');
+            }
 
-            return count($entities);
+            return count($e);
         });
 
         $this->artisan('pulse:reindex', ['model' => Property::class])->assertExitCode(0);
 
-        self::assertFalse($enabledDuringRun, 'observer sync must be suppressed while reindexing');
+        self::assertSame([100, 777], $pushed);
+        self::assertSame(0, DB::table('pulseindex_outbox')->count());
     }
 }
