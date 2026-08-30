@@ -55,6 +55,30 @@ trait PulseSearchable
         return true;
     }
 
+    /**
+     * Query used by `pulse:reconcile` to enumerate the rows that *should* be in
+     * the engine for a tenant. Default: filter by the tenant column when present.
+     *
+     * If you override {@see shouldBePulseSearchable()} with per-row logic, mirror
+     * it here as a SQL constraint — otherwise reconcile treats rows you exclude
+     * in PHP but keep in the DB as engine orphans and enqueues deletes for them.
+     *
+     * @param \Illuminate\Contracts\Database\Eloquent\Builder $query
+     * @return \Illuminate\Contracts\Database\Eloquent\Builder
+     */
+    public function pulseReconcileScope($query, string $tenant)
+    {
+        $column = function_exists('config')
+            ? (string) config('pulseindex.reconcile.tenant_column', 'tenant_id')
+            : 'tenant_id';
+
+        if ($column !== '' && $this->getConnection()->getSchemaBuilder()->hasColumn($this->getTable(), $column)) {
+            $query->where($column, $tenant);
+        }
+
+        return $query;
+    }
+
     public function getPulseEntityId(): int
     {
         return (int) $this->getKey();

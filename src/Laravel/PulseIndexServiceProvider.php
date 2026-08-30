@@ -9,6 +9,7 @@ use PulseIndex\AdminHttpClient;
 use PulseIndex\Client;
 use PulseIndex\ClientInterface;
 use PulseIndex\Laravel\Commands\OutboxWorkCommand;
+use PulseIndex\Laravel\Commands\ReconcileCommand;
 use PulseIndex\Laravel\Commands\ReindexCommand;
 
 final class PulseIndexServiceProvider extends ServiceProvider
@@ -30,6 +31,7 @@ final class PulseIndexServiceProvider extends ServiceProvider
                 'api_key' => $config['api_key'] ?? null,
                 'ssl' => filter_var($config['ssl'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'timeout_us' => (int) $timeoutUs,
+                'max_recv_bytes' => (int) ($config['reconcile']['max_recv_bytes'] ?? 0),
             ]);
         });
 
@@ -61,7 +63,7 @@ final class PulseIndexServiceProvider extends ServiceProvider
                 __DIR__ . '/../../database/migrations' => $this->app->databasePath('migrations'),
             ], 'pulseindex-migrations');
 
-            $this->commands([ReindexCommand::class, OutboxWorkCommand::class]);
+            $this->commands([ReindexCommand::class, OutboxWorkCommand::class, ReconcileCommand::class]);
         }
     }
 }

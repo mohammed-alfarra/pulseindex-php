@@ -123,4 +123,24 @@ return [
         'lease_seconds' => (int) env('PULSEINDEX_OUTBOX_LEASE', 300),
         'max_attempts' => (int) env('PULSEINDEX_OUTBOX_MAX_ATTEMPTS', 12),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Reconcile (defense in depth)
+    |--------------------------------------------------------------------------
+    |
+    | `php artisan pulse:reconcile` diffs the primary DB against the engine and
+    | enqueues outbox markers for the exact rows that drifted (bulk updates, raw
+    | SQL, pre-install data, parked markers). It never pushes directly.
+    |
+    */
+    'reconcile' => [
+        'tenants' => [],                        // explicit list; empty = auto-derive
+        'tenant_column' => 'tenant_id',
+        'page_size' => (int) env('PULSEINDEX_RECONCILE_PAGE', 50_000),
+        'max_recv_bytes' => (int) env('PULSEINDEX_RECONCILE_MAX_RECV', 32 * 1024 * 1024),
+        'max_orphans' => (int) env('PULSEINDEX_RECONCILE_MAX_ORPHANS', 10_000),
+        'max_orphan_ratio' => (float) env('PULSEINDEX_RECONCILE_MAX_ORPHAN_RATIO', 0.25),
+        'pending_threshold' => (int) env('PULSEINDEX_RECONCILE_PENDING_THRESHOLD', 1_000),
+    ],
 ];

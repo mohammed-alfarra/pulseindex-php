@@ -60,10 +60,16 @@ final class Client implements ClientInterface
             ? ChannelCredentials::createSsl()
             : ChannelCredentials::createInsecure();
 
-        $this->stub = new SearchEngineServiceClient($host, [
+        $options = [
             'credentials' => $credentials,
             'timeout' => $timeoutUs,
-        ]);
+        ];
+        if (isset($config['max_recv_bytes']) && (int) $config['max_recv_bytes'] > 0) {
+            // pulse:reconcile pages large id sets; default grpc cap is 4 MiB.
+            $options['grpc.max_receive_message_length'] = (int) $config['max_recv_bytes'];
+        }
+
+        $this->stub = new SearchEngineServiceClient($host, $options);
     }
 
     public static function create(string $host, ?string $apiKey = null, ?bool $ssl = null): self

@@ -152,6 +152,42 @@ lands in `failed_at` — **without** clearing the flag. See
 
 ---
 
+## Drift detection — `pulse:reconcile`
+
+The outbox covers everything that fires an Eloquent event. Changes that **don't** —
+`Model::query()->update()/delete()`, raw SQL, another service on the DB, data from before the
+SDK — still drift. `pulse:reconcile` diffs each searchable model against the engine per
+tenant and enqueues outbox markers for the **exact** rows that differ (missing → re-push,
+orphaned → delete). It never pushes directly.
+
+```bash
+php artisan pulse:reconcile                 # report only, exits non-zero on drift
+php artisan pulse:reconcile --apply         # enqueue the corrective markers
+php artisan pulse:reconcile --full --apply  # skip the cheap "grand totals match" gate
+```
+
+```php
+$schedule->command('pulse:reconcile --apply')->dailyAt('03:30')->withoutOverlapping();
+$schedule->command('pulse:reconcile --full --apply')->weekly()->withoutOverlapping();
+// monitoring: run without --apply in CI/health and alert on a non-zero exit.
+```
+
+If a model overrides `shouldBePulseSearchable()` with per-row logic, also express it in
+`pulseReconcileScope($query, $tenant)` — otherwise reconcile treats rows you exclude in PHP
+but keep in the DB as orphans and enqueues deletes for them.
+
+| env | default | purpose |
+|---|---|---|
+| `PULSEINDEX_RECONCILE_PAGE` | `50000` | entity ids fetched per engine page |
+| `PULSEINDEX_RECONCILE_MAX_RECV` | `33554432` | gRPC receive cap for the id pages |
+| `PULSEINDEX_RECONCILE_MAX_ORPHANS` / `_MAX_ORPHAN_RATIO` | `10000` / `0.25` | `--apply` refuses to delete more than this without `--force` |
+| `PULSEINDEX_RECONCILE_PENDING_THRESHOLD` | `1000` | abort if the outbox is more backed-up than this (counts would be transient) |
+
+`reconcile.tenants` in config pins the tenant list; empty = auto-derive from the
+`tenant_id` column.
+
+---
+
 ## PHP client
 
 ```php
