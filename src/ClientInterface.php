@@ -29,4 +29,6 @@ interface ClientInterface
     public function deleteEntity(int $entityId, string $tenantId = ''): bool;
 
     public function search(QueryBuilder $query): SearchResult;
+
+    public function getRecoveryState(): RecoveryState;
 }

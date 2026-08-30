@@ -237,6 +237,13 @@ message GetRecoveryStateResponse {
 
   // Mutations since the last successful snapshot flush.
   uint64 mutations_since_snapshot = 4;
+
+  // True when both snapshot generations were lost at cold boot. The index is
+  // empty, Search returns UNAVAILABLE, and the ingestion pipeline must re-push
+  // every live entity from the primary store, then call
+  // POST /recovery/reindex-complete on the admin port. last_cdc_offset is NOT a
+  // recovery cursor and must not be used to resume from a partial state.
+  bool needs_full_reindex = 5;
 }
 
 // SetCdcOffsetRequest updates the engine's CDC watermark.

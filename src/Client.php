@@ -7,6 +7,7 @@ namespace PulseIndex;
 use Grpc\ChannelCredentials;
 use PulseIndex\Engine\V1\BatchIndexEntitiesRequest;
 use PulseIndex\Engine\V1\DeleteEntityRequest;
+use PulseIndex\Engine\V1\GetRecoveryStateRequest;
 use PulseIndex\Engine\V1\IndexEntityRequest;
 use PulseIndex\Engine\V1\SearchEngineServiceClient;
 use PulseIndex\Exception\GrpcException;
@@ -194,6 +195,22 @@ final class Client implements ClientInterface
             matchedEntityIds: $ids,
             totalMatches: (int) $response->getTotalMatches(),
             executionTimeUs: (int) $response->getExecutionTimeUs(),
+        );
+    }
+
+    public function getRecoveryState(): RecoveryState
+    {
+        /** @var \PulseIndex\Engine\V1\GetRecoveryStateResponse $response */
+        $response = $this->unary(
+            $this->stub->GetRecoveryState(new GetRecoveryStateRequest(), $this->metadata)
+        );
+
+        return new RecoveryState(
+            lastCdcOffset: (int) $response->getLastCdcOffset(),
+            indexedCount: (int) $response->getIndexedCount(),
+            chunkCount: (int) $response->getChunkCount(),
+            mutationsSinceSnapshot: (int) $response->getMutationsSinceSnapshot(),
+            needsFullReindex: (bool) $response->getNeedsFullReindex(),
         );
     }
 

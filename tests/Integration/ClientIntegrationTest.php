@@ -99,4 +99,20 @@ final class ClientIntegrationTest extends TestCase
         self::assertNotContains(1001, $afterDelete->matchedEntityIds);
         self::assertContains(1003, $afterDelete->matchedEntityIds);
     }
+
+    public function testGetRecoveryStateReportsHealthyEngine(): void
+    {
+        $this->client->index(new Entity(
+            entityId: 42,
+            categories: ['feature:recovery-probe'],
+            tenantId: $this->tenant,
+        ));
+
+        $state = $this->client->getRecoveryState();
+
+        self::assertGreaterThan(0, $state->indexedCount);
+        self::assertGreaterThanOrEqual(0, $state->lastCdcOffset);
+        // A healthy engine is never in degraded recovery.
+        self::assertFalse($state->needsFullReindex);
+    }
 }
