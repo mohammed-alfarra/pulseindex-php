@@ -33,9 +33,12 @@ php artisan vendor:publish --tag=pulseindex-config
 ```env
 PULSEINDEX_HOST=localhost:50051
 PULSEINDEX_API_KEY=
+PULSEINDEX_SSL=false
 PULSEINDEX_TIMEOUT=5
 PULSEINDEX_FALLBACK_ENABLED=true
 ```
+
+Production customer gRPC must set `PULSEINDEX_SSL=true` (or `ssl: true` on `Client::create`). The default is plaintext for local development. Do not treat CIDR isolation as encryption.
 
 ---
 
@@ -83,6 +86,8 @@ use PulseIndex\Client;
 use PulseIndex\Entity;
 
 $client = Client::create('localhost:50051', 'your-api-key');
+// Production (TLS terminated at the engine edge, or native TLS):
+// $client = Client::create('engine.example.com:443', getenv('PULSEINDEX_API_KEY'), true);
 
 $client->index(new Entity(
     entityId: 1001,

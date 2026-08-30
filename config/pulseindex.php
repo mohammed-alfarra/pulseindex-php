@@ -29,7 +29,7 @@ return [
     | TLS
     |--------------------------------------------------------------------------
     */
-    'ssl' => (bool) env('PULSEINDEX_SSL', false),
+    'ssl' => filter_var(env('PULSEINDEX_SSL', false), FILTER_VALIDATE_BOOLEAN),
 
     /*
     |--------------------------------------------------------------------------

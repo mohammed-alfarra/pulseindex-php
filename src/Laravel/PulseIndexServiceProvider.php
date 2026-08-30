@@ -25,7 +25,7 @@ final class PulseIndexServiceProvider extends ServiceProvider
             return new Client([
                 'host' => (string) ($config['host'] ?? 'localhost:50051'),
                 'api_key' => $config['api_key'] ?? null,
-                'ssl' => (bool) ($config['ssl'] ?? false),
+                'ssl' => filter_var($config['ssl'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'timeout_us' => (int) $timeoutUs,
             ]);
         });

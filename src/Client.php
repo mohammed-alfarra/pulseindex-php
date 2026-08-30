@@ -35,7 +35,6 @@ final class Client implements ClientInterface
     {
         $host = $config['host'] ?? getenv('PULSEINDEX_HOST') ?: 'localhost:50051';
         $apiKey = $config['api_key'] ?? (getenv('PULSEINDEX_API_KEY') ?: null);
-        $ssl = (bool) ($config['ssl'] ?? false);
         $timeoutUs = (int) ($config['timeout_us'] ?? 5_000_000);
 
         $this->metadata = [];
@@ -55,6 +54,7 @@ final class Client implements ClientInterface
             );
         }
 
+        $ssl = self::sslEnabled($config);
         $credentials = $ssl
             ? ChannelCredentials::createSsl()
             : ChannelCredentials::createInsecure();
@@ -65,13 +65,36 @@ final class Client implements ClientInterface
         ]);
     }
 
-    public static function create(string $host, ?string $apiKey = null, bool $ssl = false): self
+    public static function create(string $host, ?string $apiKey = null, ?bool $ssl = null): self
     {
-        return new self([
+        $config = [
             'host' => $host,
             'api_key' => $apiKey,
-            'ssl' => $ssl,
-        ]);
+        ];
+
+        if ($ssl !== null) {
+            $config['ssl'] = $ssl;
+        }
+
+        return new self($config);
+    }
+
+    /**
+     * Production customer gRPC must use TLS (`ssl: true` / `PULSEINDEX_SSL=true`).
+     * The default is plaintext for local Docker. String `"false"` is not treated as true.
+     */
+    private static function sslEnabled(array $config): bool
+    {
+        if (array_key_exists('ssl', $config)) {
+            return filter_var($config['ssl'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        $env = getenv('PULSEINDEX_SSL');
+        if ($env === false || $env === '') {
+            return false;
+        }
+
+        return filter_var($env, FILTER_VALIDATE_BOOLEAN);
     }
 
     public function query(): QueryBuilder
