@@ -22,22 +22,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Best effort: enables the engine-diff half of check:proto. The offline
-      # hash check runs regardless. Requires an ENGINE_REPO_TOKEN secret with
-      # read access to the engine repo.
+      # The engine is a separate private repository and is the source of truth
+      # for the proto. Without it, check:proto cannot establish anything about
+      # drift, so this checkout is REQUIRED rather than best-effort: a missing
+      # or expired ENGINE_REPO_TOKEN must break the build instead of silently
+      # downgrading the guard to a green no-op.
+      #
+      # Known limitation, deliberately not worked around here: secrets are not
+      # available to pull_request runs from forks, so this step fails there. If
+      # this repository starts taking fork contributions, that needs a policy
+      # decision (pull_request_target, a separate job, or accepting that the
+      # engine comparison only runs post-merge) — not a silent conditional.
       - name: Check out engine proto
         uses: actions/checkout@v4
-        continue-on-error: true
         with:
           repository: mohammed-alfarra/PulseIndex
           path: pulseindex-engine-src
           token: ${{ secrets.ENGINE_REPO_TOKEN }}
 
       - name: Locate engine proto
-        run: |
-          if [ -f pulseindex-engine-src/proto/engine.proto ]; then
-            echo "PULSEINDEX_PROTO=$GITHUB_WORKSPACE/pulseindex-engine-src/proto/engine.proto" >> "$GITHUB_ENV"
-          fi
+        run: echo "PULSEINDEX_PROTO=$GITHUB_WORKSPACE/pulseindex-engine-src/proto/engine.proto" >> "$GITHUB_ENV"
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -48,7 +52,7 @@ jobs:
       - run: composer update --no-interaction --prefer-dist
 
       - name: Proto drift guard
-        run: composer check:proto
+        run: composer check:proto:ci
 
       - name: Unit tests
         run: vendor/bin/phpunit --testsuite Unit
