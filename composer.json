@@ -3,7 +3,13 @@
     "description": "Official PHP client SDK for the PulseIndex bitwise search engine",
     "type": "library",
     "license": "MIT",
-    "keywords": ["pulseindex", "grpc", "search", "indexing", "laravel"],
+    "keywords": [
+        "pulseindex",
+        "grpc",
+        "search",
+        "indexing",
+        "laravel"
+    ],
     "authors": [
         {
             "name": "PulseIndex"
@@ -51,10 +57,11 @@
     },
     "scripts": {
         "build-proto": "bash scripts/compile-proto.sh",
-        "check:proto": "bash scripts/check-proto.sh",
+        "check:proto": "php scripts/check-proto.php",
         "test": "phpunit",
         "test:unit": "phpunit --testsuite Unit",
-        "test:integration": "phpunit --testsuite Integration"
+        "test:integration": "phpunit --testsuite Integration",
+        "check:proto:ci": "php scripts/check-proto.php --require-engine"
     },
     "config": {
         "sort-packages": true,
