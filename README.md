@@ -207,11 +207,9 @@ Also unhealthy: the service is unreachable, or reports that it is not serving.
 Readiness is read from the standard `grpc.health.v1.Health` protocol, which
 requires no particular scope and sends no credential.
 
-This is worth knowing rather than treating as an implementation detail. The
-obvious place to ask is an operator-only call that customer API keys are not
-permitted to make. Before 2.0.0 both `pulse:health` and `pulse:reconcile` asked
-it anyway, so a perfectly healthy service was reported unreachable for every
-customer.
+Before 2.0.0 both `pulse:health` and `pulse:reconcile` asked a different way and
+reported a perfectly healthy service as unreachable. If you are upgrading from
+1.x, that is the bug you were seeing.
 
 `pulse:health` still reports `indexed_count` when the key is allowed to read it,
 but only after readiness has been decided. A key that cannot read the number no
