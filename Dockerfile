@@ -16,7 +16,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
-    PULSEINDEX_HOST=pulseindex-engine:50051 \
+    PULSEINDEX_HOST=host.docker.internal:50051 \
     PULSEINDEX_API_KEY=dev-key
 
 COPY composer.json ./

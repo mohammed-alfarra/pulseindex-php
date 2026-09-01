@@ -147,8 +147,7 @@ php artisan pulse:reindex --async
 | `internal_token` | `PULSEINDEX_ENGINE_INTERNAL_TOKEN` | required for `--recovery` |
 
 `--recovery` aborts if the service does not report a rebuild as required, or if any marker
-lands in `failed_at` — **without** clearing the flag. See
-[`pulseindex-engine/docs/ingestion-recovery.md`](../pulseindex-engine/docs/ingestion-recovery.md).
+lands in `failed_at` — **without** clearing the flag.
 
 ---
 
