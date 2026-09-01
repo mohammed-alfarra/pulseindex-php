@@ -208,7 +208,36 @@ $schedule->command('pulse:health')->everyFiveMinutes();   // + alert on non-zero
 | `PULSEINDEX_HEALTH_MAX_PENDING` | `10000` | outbox backlog exceeds this |
 | `PULSEINDEX_HEALTH_MAX_LAG` | `300` | oldest pending marker is older than this (seconds) |
 
-Also unhealthy: engine unreachable, or `needs_full_reindex`.
+Also unhealthy: engine unreachable, or the engine not serving.
+
+### Readiness comes from the gRPC health service
+
+Reachability and degraded recovery are read from `grpc.health.v1.Health`, which
+the engine serves **without** its auth interceptor — no scope required, and no
+credential sent.
+
+This matters, and it is not an implementation detail. `GetRecoveryState`, the
+obvious place to ask, requires the `admin` scope, and the engine refuses `admin`
+to any key bound to a tenant — every key the dashboard issues. Before 2.0.0 both
+`pulse:health` and `pulse:reconcile` asked it anyway, so a perfectly healthy
+engine was reported unreachable for every customer.
+
+`pulse:health` still reports `indexed_count` when the key is allowed to read it,
+but only after reachability has been decided. A key that cannot read the number
+no longer makes the engine look down.
+
+The same signal is on the client directly:
+
+```php
+use Grpc\Health\V1\HealthCheckResponse\ServingStatus;
+
+$client->health();                       // bool — reachable and serving
+$client->servingStatus();                // int  — '' is the whole server
+$client->servingStatus('pulseindex.engine.v1.SearchEngineService');
+```
+
+`health()` returns `false` rather than throwing, so unreachable and degraded
+look alike; use `servingStatus()` to tell them apart.
 
 ## Keeping the proto in sync
 
