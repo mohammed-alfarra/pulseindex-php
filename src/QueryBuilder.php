@@ -66,7 +66,7 @@ final class QueryBuilder
     }
 
     /**
-     * Exact GeoHash cell match: MUST `geo:{precision}:{hash}` bitwise tag.
+     * Exact GeoHash cell match: MUST `geo:{precision}:{hash}` tag.
      */
     public function whereGeoHash(string $geohash): self
     {

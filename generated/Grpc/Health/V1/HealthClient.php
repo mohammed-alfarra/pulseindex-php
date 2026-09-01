@@ -13,11 +13,9 @@ namespace Grpc\Health\V1;
 /**
  * The standard gRPC health checking service, as served by the PulseIndex engine.
  *
- * The engine adds this WITHOUT its auth interceptor, which is the whole reason
- * it is worth having here: every other way to ask whether the engine is
- * degraded goes through GetRecoveryState, and that requires the `admin` scope,
- * which the engine refuses to every tenant-bound key. No customer key can call
- * it, so anything built on it reports failure for every customer, always.
+ * This needs no particular scope on the API key, which is the whole reason it
+ * is worth having here: the other readiness call is operator-only, and anything
+ * built on it reports failure for every customer.
  */
 class HealthClient extends \Grpc\BaseStub
 {

@@ -7,7 +7,7 @@ namespace PulseIndex\Geo;
 use InvalidArgumentException;
 
 /**
- * Lightweight GeoHash encoder/decoder for bitwise categorical geo tags.
+ * Lightweight GeoHash encoder/decoder for categorical geo tags.
  *
  * Index entities with {@see encodeMultiTags()} (e.g. `geo:5:ezs42`, `geo:6:ezs42e`)
  * and query via {@see \PulseIndex\QueryBuilder::whereGeoHash()} or
@@ -293,7 +293,7 @@ final class GeoHash
     }
 
     /**
-     * Bitwise categorical tag `geo:{precision}:{hash}`. Idempotent if already prefixed.
+     * Categorical tag `geo:{precision}:{hash}`. Idempotent if already prefixed.
      */
     public static function tag(string $geohash): string
     {

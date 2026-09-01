@@ -15,10 +15,9 @@ final class RecoveryState
         public readonly int $chunkCount,
         public readonly int $mutationsSinceSnapshot,
         /**
-         * True when the engine lost every snapshot generation at cold boot: the
-         * index is empty, `Search` returns UNAVAILABLE, and the ingestion pipeline
-         * must re-push every live entity, then POST /recovery/reindex-complete on
-         * the admin port. `lastCdcOffset` is a bookmark, never a recovery cursor.
+         * True when the tenant's index must be rebuilt from the primary store
+         * before it can serve queries. While set, `Search` returns UNAVAILABLE.
+         * `lastCdcOffset` is a bookmark, never a resume cursor in this state.
          */
         public readonly bool $needsFullReindex,
     ) {

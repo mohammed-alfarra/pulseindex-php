@@ -43,9 +43,9 @@ final class HealthCommandTest extends TestCase
 
     public function test_engine_is_reachable_even_when_the_key_may_not_read_recovery_state(): void
     {
-        // The regression this was rewritten for. GetRecoveryState requires the
-        // `admin` scope and the engine refuses `admin` to every tenant-bound
-        // key, so the old command reported a perfectly healthy engine as
+        // The regression this was rewritten for. getRecoveryState() is
+        // operator-only and customer keys may not call it, so the old command
+        // reported a perfectly healthy service as
         // UNREACHABLE for every customer — the catch could not tell "denied"
         // from "down".
         $client = $this->createMock(ClientInterface::class);

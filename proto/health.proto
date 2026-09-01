@@ -8,7 +8,7 @@
 // It matters here because it is the only engine RPC served WITHOUT the auth
 // interceptor. Every other way to ask whether the engine is degraded goes
 // through GetRecoveryState, which requires the `admin` scope, and the engine
-// refuses `admin` to every tenant-bound key — so no customer key can use it.
+// refuses `admin` to every customer key — so no customer key can use it.
 
 syntax = "proto3";
 

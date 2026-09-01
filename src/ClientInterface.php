@@ -34,9 +34,9 @@ interface ClientInterface
 
     /**
      * Serving status from `grpc.health.v1.Health`, which the engine serves
-     * without its auth interceptor. Unlike {@see getRecoveryState()}, this
+     * without authentication. Unlike {@see getRecoveryState()}, this
      * needs no scope — that RPC requires `admin`, which the engine refuses to
-     * every tenant-bound key.
+     * every customer key.
      *
      * @return int one of \Grpc\Health\V1\HealthCheckResponse\ServingStatus
      */

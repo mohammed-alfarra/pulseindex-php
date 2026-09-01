@@ -32,7 +32,7 @@ final class HealthCommand extends Command
         // Reachability and degradation both come from the health service, which
         // needs no scope. Asking GetRecoveryState here used to report a
         // perfectly healthy engine as UNREACHABLE for every customer: that RPC
-        // requires `admin`, the engine refuses `admin` to any tenant-bound key,
+        // requires `admin`, the engine refuses `admin` to any customer key,
         // and the catch below could not tell "denied" from "down".
         try {
             $needsFullReindex = $client->servingStatus() !== ServingStatus::SERVING;

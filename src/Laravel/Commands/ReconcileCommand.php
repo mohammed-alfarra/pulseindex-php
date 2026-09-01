@@ -37,9 +37,8 @@ final class ReconcileCommand extends Command
             return self::FAILURE;
         }
 
-        // Via the health service, not GetRecoveryState: that RPC requires the
-        // `admin` scope and the engine refuses `admin` to every tenant-bound
-        // key, so this command aborted outright for every customer.
+        // Via the health service, not getRecoveryState(): that call is
+        // operator-only, so this command aborted outright for every customer.
         if ($client->servingStatus() !== ServingStatus::SERVING) {
             $this->error('Engine is not serving (degraded recovery). Run pulse:reindex --recovery first.');
 

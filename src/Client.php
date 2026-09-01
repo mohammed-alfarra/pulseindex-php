@@ -100,9 +100,9 @@ final class Client implements ClientInterface
      * named service whenever it enters or leaves degraded recovery.
      *
      * No credential is sent, and none is needed: the engine adds this service
-     * without its auth interceptor. That is the point — GetRecoveryState, the
-     * only other readiness signal, requires the `admin` scope, and the engine
-     * refuses `admin` to every tenant-bound key.
+     * without authentication. That is the point — getRecoveryState(), the
+     * only other readiness signal, is operator-only and customer keys are not
+     * permitted to make it.
      *
      * @return int one of \Grpc\Health\V1\HealthCheckResponse\ServingStatus
      */

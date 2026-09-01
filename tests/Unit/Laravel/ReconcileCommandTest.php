@@ -57,7 +57,7 @@ final class ReconcileCommandTest extends TestCase
     {
         $client = $this->createMock(ClientInterface::class);
         // The degraded gate reads the health service, not GetRecoveryState:
-        // that RPC needs `admin`, which no tenant-bound key may hold.
+        // that RPC needs `admin`, which customer keys never hold.
         $client->method('servingStatus')->willReturn($needsFullReindex ? 2 : 1);
         $client->method('getRecoveryState')->willReturn(new RecoveryState(
             lastCdcOffset: 0, indexedCount: $indexedCount, chunkCount: 0,

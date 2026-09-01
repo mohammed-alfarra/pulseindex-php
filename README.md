@@ -1,6 +1,6 @@
 # PulseIndex PHP / Laravel SDK
 
-Official PHP and Laravel client for **PulseIndex** — the Ultra-Fast, Low-Memory Sidecar Retrieval Core.
+Official PHP and Laravel client for **PulseIndex** — hosted search and filtering for large entity sets.
 
 [![Version](https://img.shields.io/badge/version-v1.0.0-blue.svg)](https://packagist.org/packages/pulseindex/pulseindex-php)
 [![Tests](https://img.shields.io/badge/tests-31%20passed-brightgreen.svg)]()
