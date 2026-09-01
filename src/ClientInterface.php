@@ -31,4 +31,17 @@ interface ClientInterface
     public function search(QueryBuilder $query): SearchResult;
 
     public function getRecoveryState(): RecoveryState;
+
+    /**
+     * Serving status from `grpc.health.v1.Health`, which the engine serves
+     * without its auth interceptor. Unlike {@see getRecoveryState()}, this
+     * needs no scope — that RPC requires `admin`, which the engine refuses to
+     * every tenant-bound key.
+     *
+     * @return int one of \Grpc\Health\V1\HealthCheckResponse\ServingStatus
+     */
+    public function servingStatus(string $service = ''): int;
+
+    /** True only when the engine is reachable and reports SERVING. */
+    public function health(): bool;
 }

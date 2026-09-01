@@ -1,0 +1,34 @@
+// The standard gRPC health checking protocol, as served by the engine.
+//
+// This is a verbatim subset of grpc/health/v1/health.proto — only `Check` is
+// used, so the streaming `Watch` RPC is omitted. It is vendored rather than
+// pulled from a package because it is a frozen protocol: it has not changed
+// since 2017, and a dependency for eleven lines is not worth the supply chain.
+//
+// It matters here because it is the only engine RPC served WITHOUT the auth
+// interceptor. Every other way to ask whether the engine is degraded goes
+// through GetRecoveryState, which requires the `admin` scope, and the engine
+// refuses `admin` to every tenant-bound key — so no customer key can use it.
+
+syntax = "proto3";
+
+package grpc.health.v1;
+
+message HealthCheckRequest {
+  // Empty string means the health of the server as a whole.
+  string service = 1;
+}
+
+message HealthCheckResponse {
+  enum ServingStatus {
+    UNKNOWN = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
+    SERVICE_UNKNOWN = 3;
+  }
+  ServingStatus status = 1;
+}
+
+service Health {
+  rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
+}

@@ -41,15 +41,40 @@ final class HealthCommandTest extends TestCase
         $this->createOutboxTable();
     }
 
+    public function test_engine_is_reachable_even_when_the_key_may_not_read_recovery_state(): void
+    {
+        // The regression this was rewritten for. GetRecoveryState requires the
+        // `admin` scope and the engine refuses `admin` to every tenant-bound
+        // key, so the old command reported a perfectly healthy engine as
+        // UNREACHABLE for every customer — the catch could not tell "denied"
+        // from "down".
+        $client = $this->createMock(ClientInterface::class);
+        $client->method('servingStatus')->willReturn(1);
+        $client->method('getRecoveryState')
+            ->willThrowException(new GrpcException('insufficient scope', 7));
+        $this->app->instance(ClientInterface::class, $client);
+        $this->app->instance(Client::class, $client);
+
+        $this->artisan('pulse:health --json')
+            ->assertExitCode(0)
+            ->expectsOutputToContain('engine_reachable');
+    }
+
     private function engine(bool $reachable = true, bool $needsFullReindex = false, int $indexed = 5): ClientInterface
     {
         $client = $this->createMock(ClientInterface::class);
+        // Reachability and degradation now come from the health service, which
+        // needs no scope. GetRecoveryState stays mocked because the command
+        // still asks it for the index size — but only as a nicety, and never in
+        // a way that can mark a reachable engine as down.
         if ($reachable) {
+            $client->method('servingStatus')->willReturn($needsFullReindex ? 2 : 1);
             $client->method('getRecoveryState')->willReturn(new RecoveryState(
                 lastCdcOffset: 0, indexedCount: $indexed, chunkCount: 0,
                 mutationsSinceSnapshot: 0, needsFullReindex: $needsFullReindex,
             ));
         } else {
+            $client->method('servingStatus')->willThrowException(new GrpcException('connection refused', 14));
             $client->method('getRecoveryState')->willThrowException(new GrpcException('connection refused', 14));
         }
         $this->app->instance(ClientInterface::class, $client);

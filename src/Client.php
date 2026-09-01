@@ -7,6 +7,9 @@ namespace PulseIndex;
 use Grpc\ChannelCredentials;
 use PulseIndex\Engine\V1\BatchIndexEntitiesRequest;
 use PulseIndex\Engine\V1\DeleteEntityRequest;
+use Grpc\Health\V1\HealthCheckRequest;
+use Grpc\Health\V1\HealthCheckResponse\ServingStatus;
+use Grpc\Health\V1\HealthClient;
 use PulseIndex\Engine\V1\GetRecoveryStateRequest;
 use PulseIndex\Engine\V1\IndexEntityRequest;
 use PulseIndex\Engine\V1\SearchEngineServiceClient;
@@ -19,6 +22,14 @@ use PulseIndex\Exception\PulseIndexException;
 final class Client implements ClientInterface
 {
     private SearchEngineServiceClient $stub;
+
+    private ?HealthClient $healthStub = null;
+
+    /** @var string|null */
+    private $healthHost = null;
+
+    /** @var array<string,mixed> */
+    private $healthOptions = [];
 
     /** @var array<string, array<int, string>> */
     private array $metadata;
@@ -41,6 +52,10 @@ final class Client implements ClientInterface
         $this->metadata = [];
         if (is_string($apiKey) && $apiKey !== '') {
             $this->metadata['x-api-key'] = [$apiKey];
+        }
+
+        if (isset($config['healthStub']) && $config['healthStub'] instanceof HealthClient) {
+            $this->healthStub = $config['healthStub'];
         }
 
         if (isset($config['stub']) && $config['stub'] instanceof SearchEngineServiceClient) {
@@ -70,6 +85,61 @@ final class Client implements ClientInterface
         }
 
         $this->stub = new SearchEngineServiceClient($host, $options);
+
+        // Kept so the health stub can be built on demand against exactly the
+        // same host and options.
+        $this->healthHost = $host;
+        $this->healthOptions = $options;
+    }
+
+    /**
+     * Serving status from `grpc.health.v1.Health`.
+     *
+     * An empty $service asks for the health of the server as a whole, which is
+     * what the health spec defines. The engine writes both that key and its own
+     * named service whenever it enters or leaves degraded recovery.
+     *
+     * No credential is sent, and none is needed: the engine adds this service
+     * without its auth interceptor. That is the point — GetRecoveryState, the
+     * only other readiness signal, requires the `admin` scope, and the engine
+     * refuses `admin` to every tenant-bound key.
+     *
+     * @return int one of \Grpc\Health\V1\HealthCheckResponse\ServingStatus
+     */
+    public function servingStatus(string $service = ''): int
+    {
+        if (!isset($this->healthStub)) {
+            if (!isset($this->healthHost)) {
+                throw new PulseIndexException(
+                    'No health stub available. Pass `healthStub` when injecting a custom `stub`.'
+                );
+            }
+            $this->healthStub = new HealthClient($this->healthHost, $this->healthOptions);
+        }
+
+        $request = new HealthCheckRequest();
+        $request->setService($service);
+
+        /** @var \Grpc\Health\V1\HealthCheckResponse $response */
+        $response = $this->unary($this->healthStub->Check($request, $this->metadata));
+
+        return $response->getStatus();
+    }
+
+    /**
+     * True only when the engine can serve reads.
+     *
+     * Returns false rather than throwing, so an unreachable engine and a
+     * degraded one look the same here; call {@see servingStatus()} to tell them
+     * apart.
+     */
+    public function health(): bool
+    {
+        try {
+            return $this->servingStatus() === ServingStatus::SERVING;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     public static function create(string $host, ?string $apiKey = null, ?bool $ssl = null): self

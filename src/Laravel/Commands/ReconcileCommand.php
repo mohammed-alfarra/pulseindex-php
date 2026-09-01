@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PulseIndex\Laravel\Commands;
 
+use Grpc\Health\V1\HealthCheckResponse\ServingStatus;
 use Illuminate\Console\Command;
 use PulseIndex\ClientInterface;
 use PulseIndex\Laravel\Outbox;
@@ -36,9 +37,11 @@ final class ReconcileCommand extends Command
             return self::FAILURE;
         }
 
-        $recovery = $client->getRecoveryState();
-        if ($recovery->needsFullReindex) {
-            $this->error('Engine is in degraded recovery (needs_full_reindex). Run pulse:reindex --recovery first.');
+        // Via the health service, not GetRecoveryState: that RPC requires the
+        // `admin` scope and the engine refuses `admin` to every tenant-bound
+        // key, so this command aborted outright for every customer.
+        if ($client->servingStatus() !== ServingStatus::SERVING) {
+            $this->error('Engine is not serving (degraded recovery). Run pulse:reindex --recovery first.');
 
             return self::FAILURE;
         }

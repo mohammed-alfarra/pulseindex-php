@@ -7,6 +7,7 @@ namespace PulseIndex\Laravel\Commands;
 use Illuminate\Console\Command;
 use PulseIndex\ClientInterface;
 use PulseIndex\Laravel\Outbox;
+use Grpc\Health\V1\HealthCheckResponse\ServingStatus;
 use Throwable;
 
 /**
@@ -27,13 +28,28 @@ final class HealthCommand extends Command
         $reachable = true;
         $needsFullReindex = false;
         $indexedCount = null;
+
+        // Reachability and degradation both come from the health service, which
+        // needs no scope. Asking GetRecoveryState here used to report a
+        // perfectly healthy engine as UNREACHABLE for every customer: that RPC
+        // requires `admin`, the engine refuses `admin` to any tenant-bound key,
+        // and the catch below could not tell "denied" from "down".
         try {
-            $state = $client->getRecoveryState();
-            $needsFullReindex = $state->needsFullReindex;
-            $indexedCount = $state->indexedCount;
+            $needsFullReindex = $client->servingStatus() !== ServingStatus::SERVING;
         } catch (Throwable $e) {
             $reachable = false;
             $engineError = $e->getMessage();
+        }
+
+        // Index size is a nicety, and only an admin key can read it. Failing to
+        // get it says nothing about whether the engine is healthy, so it must
+        // not touch $reachable.
+        if ($reachable) {
+            try {
+                $indexedCount = $client->getRecoveryState()->indexedCount;
+            } catch (Throwable $e) {
+                $indexedCount = null;
+            }
         }
 
         $pending = Outbox::pending($connections);

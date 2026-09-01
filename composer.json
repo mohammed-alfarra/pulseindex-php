@@ -37,7 +37,9 @@
         "psr-4": {
             "PulseIndex\\": "src/",
             "PulseIndex\\Engine\\V1\\": "generated/PulseIndex/Engine/V1/",
-            "GPBMetadata\\PulseIndex\\": "generated/GPBMetadata/PulseIndex/"
+            "GPBMetadata\\PulseIndex\\": "generated/GPBMetadata/PulseIndex/",
+            "Grpc\\Health\\V1\\": "generated/Grpc/Health/V1/",
+            "GPBMetadata\\": "generated/GPBMetadata/"
         }
     },
     "autoload-dev": {
