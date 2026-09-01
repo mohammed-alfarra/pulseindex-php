@@ -11,6 +11,13 @@
 # for Packagist to install from it, so anyone who looks can still read all of
 # this on GitHub. What it stops is shipping it to every consumer by default.
 
+# The generated PHP classes carry the descriptor inside them, so nothing in the
+# shipped archive reads this file — the `# source: engine.proto` line at the top
+# of each generated class is a comment. Keeping it out means a consumer's vendor
+# directory does not carry a readable copy of the service contract it never uses.
+# It stays in the repository: regenerating the stubs needs it.
+/proto              export-ignore
+
 /tests              export-ignore
 /scripts            export-ignore
 /.github            export-ignore
