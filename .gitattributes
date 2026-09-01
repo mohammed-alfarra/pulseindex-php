@@ -1,0 +1,25 @@
+# What `composer require` actually downloads.
+#
+# Without this file every tracked path lands in the dist archive, so each
+# consumer pulled the test suite, the CI workflow, the Docker dev environment
+# and the proto-sync tooling into their vendor/ directory. None of it is usable
+# by someone installing the client, and some of it describes how the service is
+# built rather than how to call it — the CI workflow names the engine's private
+# repository, and the sync scripts explain the relationship between the two.
+#
+# This bounds the archive, not the repository: the repository has to stay public
+# for Packagist to install from it, so anyone who looks can still read all of
+# this on GitHub. What it stops is shipping it to every consumer by default.
+
+/tests              export-ignore
+/scripts            export-ignore
+/.github            export-ignore
+/database           export-ignore
+/docs               export-ignore
+/Dockerfile         export-ignore
+/Dockerfile.frankenphp export-ignore
+/docker-compose.yml export-ignore
+/.dockerignore      export-ignore
+/phpunit.xml        export-ignore
+/.gitattributes     export-ignore
+/.gitignore         export-ignore

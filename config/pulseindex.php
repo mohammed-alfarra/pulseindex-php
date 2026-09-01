@@ -18,8 +18,8 @@ return [
     | API key
     |--------------------------------------------------------------------------
     |
-    | Sent as x-api-key metadata on every RPC. Must match a key configured on
-    | the engine via PULSEINDEX_API_KEYS (unless auth is disabled server-side).
+    | Sent as x-api-key metadata on every RPC. Issue and revoke keys from the
+    | PulseIndex dashboard.
     |
     */
     'api_key' => env('PULSEINDEX_API_KEY'),
