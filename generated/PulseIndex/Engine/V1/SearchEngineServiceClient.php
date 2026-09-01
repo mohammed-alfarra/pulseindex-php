@@ -6,21 +6,20 @@
 //
 // Package: pulseindex.engine.v1
 //
-// This is the sole wire contract for the PulseIndex Rust core engine.
-// External client SDKs (Go, TypeScript, Python, etc.) SHOULD generate stubs
-// directly from this file. The engine stores no entity payloads — only
-// bitwise indexes — and returns matched entity IDs for the caller to hydrate
-// from a primary data store.
+// The wire contract for the PulseIndex service. Client SDKs generate stubs
+// directly from this file. Queries return matching entity IDs, which the caller
+// hydrates from its own primary data store — record contents are never sent
+// here and are never stored by the service.
 //
 // Authentication (transport metadata, not proto fields):
 //   - Header `x-api-key: <key>`  OR
 //   - Header `authorization: Bearer <key>`
-//   Valid keys are configured on the server via `PULSEINDEX_API_KEYS`.
+//   Keys are issued and revoked from the PulseIndex dashboard.
 //
 // Multi-tenancy:
 //   Every mutating / query RPC that touches index state carries `tenant_id`.
 //   Empty `tenant_id` is normalized server-side to `"default"`. Tenants are
-//   fully isolated (separate in-memory bitset spaces).
+//   fully isolated from one another.
 //
 namespace PulseIndex\Engine\V1;
 
@@ -39,9 +38,9 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
     }
 
     /**
-     * IndexEntity upserts a single entity into the tenant's in-memory bit index.
+     * IndexEntity upserts a single entity into the tenant's index.
      * Re-indexing the same entity_id within a tenant refreshes its attribute bits
-     * and clears any soft-delete (tombstone) for that id.
+     * and clears any soft-delete for that id.
      * @param \PulseIndex\Engine\V1\IndexEntityRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
@@ -72,7 +71,7 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
     }
 
     /**
-     * DeleteEntity soft-deletes an entity inside a tenant (tombstone).
+     * DeleteEntity soft-deletes an entity inside a tenant.
      * The entity id is excluded from subsequent Search results for that tenant.
      * @param \PulseIndex\Engine\V1\DeleteEntityRequest $argument input argument
      * @param array $metadata metadata
@@ -88,7 +87,7 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
     }
 
     /**
-     * Search runs bitwise filter cascades (MUST / SHOULD / MUST_NOT) plus optional
+     * Search applies the boolean filters (MUST / SHOULD / MUST_NOT) plus optional
      * numeric range predicates and returns matching entity IDs only.
      * When `limit` > 0 the engine may early-exit for microsecond latency and
      * `total_matches` reflects the scanned page path (exact totals when limit == 0).
@@ -106,7 +105,7 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
     }
 
     /**
-     * CreateSnapshot forces an immediate binary mmap snapshot to disk.
+     * CreateSnapshot forces an immediate durable checkpoint. Operator use.
      * @param \PulseIndex\Engine\V1\CreateSnapshotRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
@@ -121,7 +120,7 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
     }
 
     /**
-     * GetRecoveryState returns CDC offset and coarse index sizing metrics.
+     * GetRecoveryState returns coarse index metrics. Operator use.
      * @param \PulseIndex\Engine\V1\GetRecoveryStateRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
@@ -136,7 +135,7 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
     }
 
     /**
-     * SetCdcOffset records the last applied CDC / mutation sequence number so
+     * SetCdcOffset records the last applied upstream sequence number so
      * cold-boot recovery can resume from the correct upstream offset.
      * @param \PulseIndex\Engine\V1\SetCdcOffsetRequest $argument input argument
      * @param array $metadata metadata
