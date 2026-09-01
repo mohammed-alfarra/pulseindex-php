@@ -131,23 +131,16 @@ php artisan pulse:reindex "App\Models\Property"
 # Rebuild every configured model
 php artisan pulse:reindex
 
-# After the service reports that a tenant's index must be rebuilt:
-#   rebuilds every model, drains, then clears the flag
-php artisan pulse:reindex --recovery
-
 # enqueue only; let pulse:outbox:work drain
 php artisan pulse:reindex --async
 ```
 
 | key | env | purpose |
 |---|---|---|
-| `searchable_models` | — | FQCNs for no-arg / `--recovery` mode |
-| `admin_url` | `PULSEINDEX_ADMIN_URL` | engine admin base URL; derived from `host` + `admin_port` if unset |
-| `admin_port` | `PULSEINDEX_ADMIN_PORT` | default `8081` |
-| `internal_token` | `PULSEINDEX_ENGINE_INTERNAL_TOKEN` | required for `--recovery` |
+| `searchable_models` | — | FQCNs rebuilt when no model argument is given |
 
-`--recovery` aborts if the service does not report a rebuild as required, or if any marker
-lands in `failed_at` — **without** clearing the flag.
+If `health()` reports the service is not answering queries, rebuild with
+`pulse:reindex` and it will start serving again once the outbox drains.
 
 ---
 

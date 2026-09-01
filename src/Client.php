@@ -96,7 +96,7 @@ final class Client implements ClientInterface
      *
      * An empty $service asks for the health of the server as a whole, which is
      * what the health spec defines. The engine writes both that key and its own
-     * named service whenever it enters or leaves degraded recovery.
+     * named service, and tracks whether it can currently answer queries.
      *
      * No credential is sent, and none is needed: the engine adds this service
      *

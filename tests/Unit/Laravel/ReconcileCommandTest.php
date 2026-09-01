@@ -129,7 +129,7 @@ final class ReconcileCommandTest extends TestCase
         $this->client(indexedCount: 0, engineIds: [], needsFullReindex: true);
 
         $this->artisan('pulse:reconcile', ['--full' => true])
-            ->expectsOutputToContain('degraded recovery')
+            ->expectsOutputToContain('not answering queries')
             ->assertFailed();
     }
 

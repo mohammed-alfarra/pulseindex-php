@@ -39,7 +39,7 @@ final class ReconcileCommand extends Command
 
         // Readiness comes from the health service, which needs no scope.
         if ($client->servingStatus() !== ServingStatus::SERVING) {
-            $this->error('Engine is not serving (degraded recovery). Run pulse:reindex --recovery first.');
+            $this->error('The service is not answering queries; rebuild with pulse:reindex first.');
 
             return self::FAILURE;
         }

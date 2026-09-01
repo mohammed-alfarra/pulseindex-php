@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PulseIndex\Laravel;
 
 use Illuminate\Support\ServiceProvider;
-use PulseIndex\AdminHttpClient;
 use PulseIndex\Client;
 use PulseIndex\ClientInterface;
 use PulseIndex\Laravel\Commands\HealthCommand;
@@ -39,16 +38,6 @@ final class PulseIndexServiceProvider extends ServiceProvider
         $this->app->bind(ClientInterface::class, fn ($app) => $app->make(Client::class));
         $this->app->alias(Client::class, 'pulseindex');
 
-        $this->app->singleton(AdminHttpClient::class, function ($app): AdminHttpClient {
-            $config = $app['config']->get('pulseindex', []);
-
-            return AdminHttpClient::fromConfig(
-                $config['admin_url'] ?? null,
-                (string) ($config['host'] ?? 'localhost:50051'),
-                (int) ($config['admin_port'] ?? 8081),
-                $config['internal_token'] ?? null,
-            );
-        });
     }
 
     public function boot(): void

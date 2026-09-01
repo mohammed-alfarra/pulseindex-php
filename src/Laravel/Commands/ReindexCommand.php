@@ -4,11 +4,7 @@ declare(strict_types=1);
 
 namespace PulseIndex\Laravel\Commands;
 
-use Grpc\Health\V1\HealthCheckResponse\ServingStatus;
 use Illuminate\Console\Command;
-use PulseIndex\AdminHttpClient;
-use PulseIndex\ClientInterface;
-use PulseIndex\Exception\PulseIndexException;
 use PulseIndex\Laravel\Outbox;
 use PulseIndex\Laravel\OutboxWorker;
 
@@ -27,46 +23,21 @@ final class ReindexCommand extends Command
 {
     protected $signature = 'pulse:reindex
         {model? : One model FQCN. Omit to rebuild every pulseindex.searchable_models.}
-        {--recovery : Require the engine to be in degraded recovery, then mark it complete. No model argument.}
-        {--async : Enqueue only; let pulse:outbox:work drain (not allowed with --recovery).}
+        {--async : Enqueue only; let pulse:outbox:work drain.}
         {--chunk=1000 : Rows per DB read / drain batch.}';
 
-    protected $description = 'Rebuild the PulseIndex index from the primary database (bootstrap or recovery).';
+    protected $description = 'Rebuild the PulseIndex index from the primary database.';
 
-    public function handle(ClientInterface $client, AdminHttpClient $admin, OutboxWorker $worker): int
+    public function handle(OutboxWorker $worker): int
     {
         $chunk = max(1, (int) $this->option('chunk'));
-        $recovery = (bool) $this->option('recovery');
         $async = (bool) $this->option('async');
-        $modelArg = $this->argument('model');
 
-        if ($recovery && $modelArg !== null) {
-            $this->error('--recovery rebuilds the whole index; run `pulse:reindex --recovery` with no model argument.');
-
-            return self::FAILURE;
-        }
-        if ($recovery && $async) {
-            $this->error('--async cannot be combined with --recovery (recovery must confirm the drain finished).');
-
-            return self::FAILURE;
-        }
-
-        $targets = $this->resolveTargets($modelArg);
+        $targets = $this->resolveTargets($this->argument('model'));
         if ($targets === null) {
             return self::FAILURE;
         }
 
-        if ($recovery) {
-            // A service that is serving does not need a recovery rebuild, and
-            // running one anyway would re-push everything for nothing.
-            if ($client->servingStatus() === ServingStatus::SERVING) {
-                $this->error('The service is serving normally. '
-                    . 'Run without --recovery for a normal rebuild.');
-
-                return self::FAILURE;
-            }
-            $this->warn('The service is not serving — rebuilding every configured model.');
-        }
 
         $enqueued = $this->enqueue($targets, $chunk);
         $this->info(sprintf('Enqueued %s marker(s) across %s model(s).', number_format($enqueued), count($targets)));
@@ -78,21 +49,11 @@ final class ReindexCommand extends Command
         }
 
         if (!$this->drain($worker, $chunk)) {
-            $this->error('Outbox did not drain cleanly (failed rows present). Fix the cause and re-run; the flag was NOT cleared.');
+            $this->error('Outbox did not drain cleanly (failed rows present). Fix the cause and re-run.');
 
             return self::FAILURE;
         }
 
-        if ($recovery) {
-            try {
-                $admin->markReindexComplete();
-            } catch (PulseIndexException $e) {
-                $this->error('Indexing succeeded but the engine did not clear needs_full_reindex: ' . $e->getMessage());
-
-                return self::FAILURE;
-            }
-            $this->info('Engine degraded-recovery flag cleared; /ready and Search are restored.');
-        }
 
         return self::SUCCESS;
     }

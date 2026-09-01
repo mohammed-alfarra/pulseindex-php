@@ -2,6 +2,19 @@
 
 ## 2.0.0
 
+### Breaking: the operator surface is gone
+
+`AdminHttpClient` and `pulse:reindex --recovery` are removed, with the
+`admin_url`, `admin_port` and `internal_token` configuration behind them.
+
+Neither could ever work from a customer's application: the admin port is not
+published on the internet, and the call needs the internal token shared between
+the service and its control plane. They were shipped tooling for a capability
+that was never the client's.
+
+`pulse:reindex` still rebuilds the index from your models. If the service stops
+answering queries, run it — the service resumes once the outbox drains.
+
 ### Breaking: `getRecoveryState()` and `RecoveryState` are gone
 
 Along with the RPCs behind them in the bundled proto. No key the dashboard
