@@ -11,9 +11,8 @@ use PulseIndex\Laravel\OutboxWorker;
 /**
  * Bootstrap or rebuild the PulseIndex index from the primary database.
  *
- * The engine is a push-sink with no backfill of its own; this is the only path
- * that (re)populates it from existing rows, and the operator tool for clearing
- * the engine's `needs_full_reindex` flag after a total snapshot loss.
+ * The service has no backfill of its own; this is the only path that
+ * (re)populates it from existing rows.
  *
  * It enqueues a durable outbox marker per row and drains through the same worker
  * as live changes, so it is safe to run while the application keeps writing —

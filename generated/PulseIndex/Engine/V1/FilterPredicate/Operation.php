@@ -3,7 +3,7 @@
 # NO CHECKED-IN PROTOBUF GENCODE
 # source: engine.proto
 
-namespace Pulseindex\Engine\V1\FilterPredicate;
+namespace PulseIndex\Engine\V1\FilterPredicate;
 
 use UnexpectedValueException;
 

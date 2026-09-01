@@ -3,7 +3,7 @@
 # NO CHECKED-IN PROTOBUF GENCODE
 # source: engine.proto
 
-namespace Pulseindex\Engine\V1;
+namespace PulseIndex\Engine\V1;
 
 use Google\Protobuf\Internal\GPBType;
 use Google\Protobuf\Internal\GPBUtil;
@@ -43,7 +43,7 @@ class FilterPredicate extends \Google\Protobuf\Internal\Message
      */
     public function __construct($data = null)
     {
-        \GPBMetadata\Engine::initOnce();
+        \GPBMetadata\PulseIndex\Engine::initOnce();
         parent::__construct($data);
     }
 
@@ -51,7 +51,7 @@ class FilterPredicate extends \Google\Protobuf\Internal\Message
      * How this predicate combines with the current match set.
      *
      * Generated from protobuf field <code>.pulseindex.engine.v1.FilterPredicate.Operation op = 1;</code>
-     * @return int one of the values in {@see \Pulseindex\Engine\V1\FilterPredicate\Operation}
+     * @return int one of the values in {@see \PulseIndex\Engine\V1\FilterPredicate\Operation}
      */
     public function getOp()
     {
@@ -62,12 +62,12 @@ class FilterPredicate extends \Google\Protobuf\Internal\Message
      * How this predicate combines with the current match set.
      *
      * Generated from protobuf field <code>.pulseindex.engine.v1.FilterPredicate.Operation op = 1;</code>
-     * @param int $var one of the values in {@see \Pulseindex\Engine\V1\FilterPredicate\Operation}
+     * @param int $var one of the values in {@see \PulseIndex\Engine\V1\FilterPredicate\Operation}
      * @return $this
      */
     public function setOp(int $var)
     {
-        GPBUtil::checkEnum($var, \Pulseindex\Engine\V1\FilterPredicate\Operation::class);
+        GPBUtil::checkEnum($var, \PulseIndex\Engine\V1\FilterPredicate\Operation::class);
         $this->op = $var;
 
         return $this;

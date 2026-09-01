@@ -21,6 +21,9 @@ syntax = "proto3";
 
 package pulseindex.engine.v1;
 
+option php_namespace = "PulseIndex\\Engine\\V1";
+option php_metadata_namespace = "GPBMetadata\\PulseIndex";
+
 // SearchEngineService is the PulseIndex query and indexing API.
 service SearchEngineService {
   // IndexEntity upserts a single entity into the tenant's index.

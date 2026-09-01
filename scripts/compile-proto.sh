@@ -7,19 +7,21 @@ PROTO_DIR="${ROOT}/proto"
 OUT_DIR="${ROOT}/generated"
 PROTO_FILE="${PROTO_DIR}/engine.proto"
 
-# Prefer an explicit path, then sibling pulseindex-engine checkout, else vendored copy.
-SOURCE_PROTO="${PULSEINDEX_PROTO:-}"
-if [[ -z "${SOURCE_PROTO}" ]]; then
-  CANDIDATES=(
-    "${ROOT}/../pulseindex-engine/proto/engine.proto"
-    "${ROOT}/../PulseIndex/proto/engine.proto"
-  )
-  for candidate in "${CANDIDATES[@]}"; do
-    if [[ -f "${candidate}" ]]; then
-      SOURCE_PROTO="${candidate}"
-      break
-    fi
-  done
+# Compiles the VENDORED proto. It is deliberately a subset of the service's —
+# the operator RPCs are omitted because no customer key can call them — so
+# copying the service's file over it would silently undo that.
+#
+# Syncing is therefore an explicit act: pass the source path and re-trim by hand.
+#   PULSEINDEX_PROTO=../pulseindex-engine/proto/engine.proto scripts/compile-proto.sh --sync
+SOURCE_PROTO=""
+if [[ "${1:-}" == "--sync" ]]; then
+  SOURCE_PROTO="${PULSEINDEX_PROTO:-}"
+  if [[ -z "${SOURCE_PROTO}" ]]; then
+    echo "error: --sync needs PULSEINDEX_PROTO pointing at the service's proto" >&2
+    exit 1
+  fi
+  echo "WARNING: overwriting the vendored proto. Re-remove the operator RPCs"
+  echo "         before committing, or the client will publish them again." >&2
 fi
 
 mkdir -p "${PROTO_DIR}" "${OUT_DIR}"

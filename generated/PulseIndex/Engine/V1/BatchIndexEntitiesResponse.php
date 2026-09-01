@@ -3,7 +3,7 @@
 # NO CHECKED-IN PROTOBUF GENCODE
 # source: engine.proto
 
-namespace Pulseindex\Engine\V1;
+namespace PulseIndex\Engine\V1;
 
 use Google\Protobuf\Internal\GPBType;
 use Google\Protobuf\Internal\GPBUtil;
@@ -35,7 +35,7 @@ class BatchIndexEntitiesResponse extends \Google\Protobuf\Internal\Message
      */
     public function __construct($data = null)
     {
-        \GPBMetadata\Engine::initOnce();
+        \GPBMetadata\PulseIndex\Engine::initOnce();
         parent::__construct($data);
     }
 

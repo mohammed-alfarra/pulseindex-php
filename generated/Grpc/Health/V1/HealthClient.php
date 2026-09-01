@@ -13,9 +13,8 @@ namespace Grpc\Health\V1;
 /**
  * The standard gRPC health checking service, as served by the PulseIndex engine.
  *
- * This needs no particular scope on the API key, which is the whole reason it
- * is worth having here: the other readiness call is operator-only, and anything
- * built on it reports failure for every customer.
+ * Needs no particular scope on the API key, so it works with any key — which is
+ * why readiness is read from here.
  */
 class HealthClient extends \Grpc\BaseStub
 {

@@ -3,7 +3,7 @@
 # NO CHECKED-IN PROTOBUF GENCODE
 # source: engine.proto
 
-namespace Pulseindex\Engine\V1;
+namespace PulseIndex\Engine\V1;
 
 use Google\Protobuf\Internal\GPBType;
 use Google\Protobuf\Internal\GPBUtil;
@@ -29,13 +29,13 @@ class BatchIndexEntitiesRequest extends \Google\Protobuf\Internal\Message
      * @param array $data {
      *     Optional. Data for populating the Message object.
      *
-     *     @type \Pulseindex\Engine\V1\IndexEntityRequest[] $entities
+     *     @type \PulseIndex\Engine\V1\IndexEntityRequest[] $entities
      *           Entities to index. Each entry may specify its own tenant_id.
      * }
      */
     public function __construct($data = null)
     {
-        \GPBMetadata\Engine::initOnce();
+        \GPBMetadata\PulseIndex\Engine::initOnce();
         parent::__construct($data);
     }
 
@@ -43,7 +43,7 @@ class BatchIndexEntitiesRequest extends \Google\Protobuf\Internal\Message
      * Entities to index. Each entry may specify its own tenant_id.
      *
      * Generated from protobuf field <code>repeated .pulseindex.engine.v1.IndexEntityRequest entities = 1;</code>
-     * @return RepeatedField<\Pulseindex\Engine\V1\IndexEntityRequest>
+     * @return RepeatedField<\PulseIndex\Engine\V1\IndexEntityRequest>
      */
     public function getEntities()
     {
@@ -54,12 +54,12 @@ class BatchIndexEntitiesRequest extends \Google\Protobuf\Internal\Message
      * Entities to index. Each entry may specify its own tenant_id.
      *
      * Generated from protobuf field <code>repeated .pulseindex.engine.v1.IndexEntityRequest entities = 1;</code>
-     * @param \Pulseindex\Engine\V1\IndexEntityRequest[] $var
+     * @param \PulseIndex\Engine\V1\IndexEntityRequest[] $var
      * @return $this
      */
     public function setEntities(array|RepeatedField $var)
     {
-        $arr = GPBUtil::checkRepeatedField($var, \Google\Protobuf\Internal\GPBType::MESSAGE, \Pulseindex\Engine\V1\IndexEntityRequest::class);
+        $arr = GPBUtil::checkRepeatedField($var, \Google\Protobuf\Internal\GPBType::MESSAGE, \PulseIndex\Engine\V1\IndexEntityRequest::class);
         $this->entities = $arr;
 
         return $this;

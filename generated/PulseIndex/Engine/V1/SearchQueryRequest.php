@@ -3,7 +3,7 @@
 # NO CHECKED-IN PROTOBUF GENCODE
 # source: engine.proto
 
-namespace Pulseindex\Engine\V1;
+namespace PulseIndex\Engine\V1;
 
 use Google\Protobuf\Internal\GPBType;
 use Google\Protobuf\Internal\GPBUtil;
@@ -65,10 +65,10 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      *     @type int|string $location_prefix
      *           Optional location constraint (0 = no location filter).
      *           When non-zero, only entities indexed with that location_prefix match.
-     *     @type \Pulseindex\Engine\V1\FilterPredicate[] $filters
+     *     @type \PulseIndex\Engine\V1\FilterPredicate[] $filters
      *           Attribute predicates (MUST / SHOULD / MUST_NOT). Order does not affect the
      *           result.
-     *     @type \Pulseindex\Engine\V1\RangePredicate[] $ranges
+     *     @type \PulseIndex\Engine\V1\RangePredicate[] $ranges
      *           Optional numeric range filters (e.g. price between min_val and max_val).
      *     @type int $limit
      *           Maximum number of entity IDs to return.
@@ -81,7 +81,7 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      */
     public function __construct($data = null)
     {
-        \GPBMetadata\Engine::initOnce();
+        \GPBMetadata\PulseIndex\Engine::initOnce();
         parent::__construct($data);
     }
 
@@ -118,7 +118,7 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      * result.
      *
      * Generated from protobuf field <code>repeated .pulseindex.engine.v1.FilterPredicate filters = 2;</code>
-     * @return RepeatedField<\Pulseindex\Engine\V1\FilterPredicate>
+     * @return RepeatedField<\PulseIndex\Engine\V1\FilterPredicate>
      */
     public function getFilters()
     {
@@ -130,12 +130,12 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      * result.
      *
      * Generated from protobuf field <code>repeated .pulseindex.engine.v1.FilterPredicate filters = 2;</code>
-     * @param \Pulseindex\Engine\V1\FilterPredicate[] $var
+     * @param \PulseIndex\Engine\V1\FilterPredicate[] $var
      * @return $this
      */
     public function setFilters(array|RepeatedField $var)
     {
-        $arr = GPBUtil::checkRepeatedField($var, \Google\Protobuf\Internal\GPBType::MESSAGE, \Pulseindex\Engine\V1\FilterPredicate::class);
+        $arr = GPBUtil::checkRepeatedField($var, \Google\Protobuf\Internal\GPBType::MESSAGE, \PulseIndex\Engine\V1\FilterPredicate::class);
         $this->filters = $arr;
 
         return $this;
@@ -145,7 +145,7 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      * Optional numeric range filters (e.g. price between min_val and max_val).
      *
      * Generated from protobuf field <code>repeated .pulseindex.engine.v1.RangePredicate ranges = 3;</code>
-     * @return RepeatedField<\Pulseindex\Engine\V1\RangePredicate>
+     * @return RepeatedField<\PulseIndex\Engine\V1\RangePredicate>
      */
     public function getRanges()
     {
@@ -156,12 +156,12 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      * Optional numeric range filters (e.g. price between min_val and max_val).
      *
      * Generated from protobuf field <code>repeated .pulseindex.engine.v1.RangePredicate ranges = 3;</code>
-     * @param \Pulseindex\Engine\V1\RangePredicate[] $var
+     * @param \PulseIndex\Engine\V1\RangePredicate[] $var
      * @return $this
      */
     public function setRanges(array|RepeatedField $var)
     {
-        $arr = GPBUtil::checkRepeatedField($var, \Google\Protobuf\Internal\GPBType::MESSAGE, \Pulseindex\Engine\V1\RangePredicate::class);
+        $arr = GPBUtil::checkRepeatedField($var, \Google\Protobuf\Internal\GPBType::MESSAGE, \PulseIndex\Engine\V1\RangePredicate::class);
         $this->ranges = $arr;
 
         return $this;
