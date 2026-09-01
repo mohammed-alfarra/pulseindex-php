@@ -104,50 +104,7 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
         $metadata, $options);
     }
 
-    /**
-     * CreateSnapshot forces an immediate durable checkpoint. Operator use.
-     * @param \PulseIndex\Engine\V1\CreateSnapshotRequest $argument input argument
-     * @param array $metadata metadata
-     * @param array $options call options
-     * @return \Grpc\UnaryCall
-     */
-    public function CreateSnapshot(\PulseIndex\Engine\V1\CreateSnapshotRequest $argument,
-      $metadata = [], $options = []) {
-        return $this->_simpleRequest('/pulseindex.engine.v1.SearchEngineService/CreateSnapshot',
-        $argument,
-        ['\PulseIndex\Engine\V1\CreateSnapshotResponse', 'decode'],
-        $metadata, $options);
-    }
 
-    /**
-     * GetRecoveryState returns coarse index metrics. Operator use.
-     * @param \PulseIndex\Engine\V1\GetRecoveryStateRequest $argument input argument
-     * @param array $metadata metadata
-     * @param array $options call options
-     * @return \Grpc\UnaryCall
-     */
-    public function GetRecoveryState(\PulseIndex\Engine\V1\GetRecoveryStateRequest $argument,
-      $metadata = [], $options = []) {
-        return $this->_simpleRequest('/pulseindex.engine.v1.SearchEngineService/GetRecoveryState',
-        $argument,
-        ['\PulseIndex\Engine\V1\GetRecoveryStateResponse', 'decode'],
-        $metadata, $options);
-    }
 
-    /**
-     * SetCdcOffset records the last applied upstream sequence number so a restart
-     * can resume from the correct point. Operator use.
-     * @param \PulseIndex\Engine\V1\SetCdcOffsetRequest $argument input argument
-     * @param array $metadata metadata
-     * @param array $options call options
-     * @return \Grpc\UnaryCall
-     */
-    public function SetCdcOffset(\PulseIndex\Engine\V1\SetCdcOffsetRequest $argument,
-      $metadata = [], $options = []) {
-        return $this->_simpleRequest('/pulseindex.engine.v1.SearchEngineService/SetCdcOffset',
-        $argument,
-        ['\PulseIndex\Engine\V1\SetCdcOffsetResponse', 'decode'],
-        $metadata, $options);
-    }
 
 }

@@ -36,9 +36,6 @@ final class ProtoSchemaTest extends TestCase
                 'BatchIndexEntities(BatchIndexEntitiesRequest) -> BatchIndexEntitiesResponse',
                 'DeleteEntity(DeleteEntityRequest) -> DeleteEntityResponse',
                 'Search(SearchQueryRequest) -> SearchQueryResponse',
-                'CreateSnapshot(CreateSnapshotRequest) -> CreateSnapshotResponse',
-                'GetRecoveryState(GetRecoveryStateRequest) -> GetRecoveryStateResponse',
-                'SetCdcOffset(SetCdcOffsetRequest) -> SetCdcOffsetResponse',
             ],
             'messages' => [
                 'IndexEntityRequest' => [
@@ -68,22 +65,6 @@ final class ProtoSchemaTest extends TestCase
                     '2:uint32 total_matches',
                     '3:uint64 execution_time_us',
                 ],
-                'CreateSnapshotRequest' => [],
-                'CreateSnapshotResponse' => [
-                    '1:bool success',
-                    '2:string path',
-                    '3:uint64 last_cdc_offset',
-                ],
-                'GetRecoveryStateRequest' => [],
-                'GetRecoveryStateResponse' => [
-                    '1:uint64 last_cdc_offset',
-                    '2:uint64 indexed_count',
-                    '3:uint32 chunk_count',
-                    '4:uint64 mutations_since_snapshot',
-                    '5:bool needs_full_reindex',
-                ],
-                'SetCdcOffsetRequest' => ['1:uint64 offset'],
-                'SetCdcOffsetResponse' => ['1:bool success'],
             ],
             'enums' => [
                 'FilterPredicate.Operation' => ['MUST=0', 'SHOULD=1', 'MUST_NOT=2'],
@@ -141,22 +122,22 @@ final class ProtoSchemaTest extends TestCase
     {
         return [
             'removed field' => [
-                '  bool needs_full_reindex = 5;',
+                '  uint32 total_matches = 2;',
                 '',
                 true,
-                'lost   5:bool needs_full_reindex',
+                'lost   2:uint32 total_matches',
             ],
             'renumbered field' => [
-                'bool needs_full_reindex = 5;',
-                'bool needs_full_reindex = 6;',
+                'uint32 total_matches = 2;',
+                'uint32 total_matches = 9;',
                 true,
-                'gained 6:bool needs_full_reindex',
+                'gained 9:uint32 total_matches',
             ],
             'renamed field' => [
-                'uint64 indexed_count = 2;',
-                'uint64 indexedCount = 2;',
+                'uint64 execution_time_us = 3;',
+                'uint64 executionTimeUs = 3;',
                 true,
-                'gained 2:uint64 indexedCount',
+                'gained 3:uint64 executionTimeUs',
             ],
             'retyped field' => [
                 'uint32 total_matches = 2;',
@@ -165,10 +146,10 @@ final class ProtoSchemaTest extends TestCase
                 'gained 2:uint64 total_matches',
             ],
             'removed rpc' => [
-                'rpc SetCdcOffset (SetCdcOffsetRequest) returns (SetCdcOffsetResponse);',
+                'rpc DeleteEntity (DeleteEntityRequest) returns (DeleteEntityResponse);',
                 '',
                 true,
-                'rpc removed: SetCdcOffset',
+                'rpc removed: DeleteEntity',
             ],
             'renumbered enum value' => [
                 'MUST_NOT = 2;',
@@ -224,11 +205,11 @@ final class ProtoSchemaTest extends TestCase
 
     public function test_still_carries_the_recovery_fields_the_sdk_reads(): void
     {
-        // RecoveryState / Client::getRecoveryState() read these by name. A
-        // rename or removal would surface as a default value, not an error.
-        $recovery = self::actual()->messages['GetRecoveryStateResponse'] ?? [];
-        foreach (self::expected()['messages']['GetRecoveryStateResponse'] as $field) {
-            self::assertContains($field, $recovery, "GetRecoveryStateResponse lost {$field}");
+        // Client::search() reads these by name, so a rename upstream would be
+        // silent at runtime rather than loud.
+        $search = self::actual()->messages['SearchQueryResponse'] ?? [];
+        foreach (self::expected()['messages']['SearchQueryResponse'] as $field) {
+            self::assertContains($field, $search, "SearchQueryResponse lost {$field}");
         }
     }
 }

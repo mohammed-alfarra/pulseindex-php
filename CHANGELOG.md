@@ -2,6 +2,25 @@
 
 ## 2.0.0
 
+### Breaking: `getRecoveryState()` and `RecoveryState` are gone
+
+Along with the RPCs behind them in the bundled proto. No key the dashboard
+issues could call that RPC — every attempt returned a permission error — so
+nothing that worked stops working.
+
+**Checking readiness:** `health()`, or `servingStatus()` when you need to tell
+"not answering" apart from "not reachable". Both work with any key.
+
+Two commands changed with it:
+
+- `pulse:reindex --recovery` gates on the health service instead. Same
+  behaviour: it refuses to run while the service is answering normally.
+- `pulse:reconcile` lost its shortcut. It used to compare grand totals before
+  sweeping, which needed an index-wide count only an operator key can read, so
+  every run now walks the models. Slower, same answer. `--full` is accepted and
+  ignored.
+- `pulse:health` no longer reports `indexed_count`; the JSON carries `null`.
+
 ### Breaking: `ClientInterface` gained two methods
 
 ```php

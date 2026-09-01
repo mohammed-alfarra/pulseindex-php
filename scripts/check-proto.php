@@ -127,7 +127,7 @@ if ($source === null) {
 
 $engineText = (string) file_get_contents($source);
 
-$diff = ProtoSchema::diff(
+$diff = ProtoSchema::subsetDiff(
     ProtoSchema::parse($engineText),
     ProtoSchema::parse($vendorText),
 );
@@ -147,12 +147,7 @@ if ($diff !== []) {
     exit(1);
 }
 
-if ($normalise($engineText) !== $normalise($vendorText)) {
-    echo "ok: schema matches the engine ({$source})\n";
-    echo "warning: the files differ in layout (field ordering or formatting) beyond\n";
-    echo "         comments. Re-sync the declarations, keeping the vendored comments.\n";
-    exit(0);
-}
 
-echo "ok: vendored proto matches the engine, declaration for declaration ({$source})\n";
-echo "    comments differ by design — the vendored copy is published.\n";
+
+echo "ok: every declaration in the vendored proto matches the engine ({$source})\n";
+echo "    the published copy omits the operator RPCs on purpose.\n";

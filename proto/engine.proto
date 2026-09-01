@@ -42,15 +42,8 @@ service SearchEngineService {
   // `limit` is 0.
   rpc Search (SearchQueryRequest) returns (SearchQueryResponse);
 
-  // CreateSnapshot forces an immediate durable checkpoint. Operator use.
-  rpc CreateSnapshot (CreateSnapshotRequest) returns (CreateSnapshotResponse);
 
-  // GetRecoveryState returns coarse index metrics. Operator use.
-  rpc GetRecoveryState (GetRecoveryStateRequest) returns (GetRecoveryStateResponse);
 
-  // SetCdcOffset records the last applied upstream sequence number so a restart
-  // can resume from the correct point. Operator use.
-  rpc SetCdcOffset (SetCdcOffsetRequest) returns (SetCdcOffsetResponse);
 }
 
 // ---------------------------------------------------------------------------
@@ -195,58 +188,4 @@ message SearchQueryResponse {
 
   // Server-side execution time in microseconds (excludes network RTT).
   uint64 execution_time_us = 3;
-}
-
-// ---------------------------------------------------------------------------
-// Operator control plane
-// ---------------------------------------------------------------------------
-
-// CreateSnapshotRequest triggers an immediate durable checkpoint.
-message CreateSnapshotRequest {}
-
-// CreateSnapshotResponse acknowledges the checkpoint.
-message CreateSnapshotResponse {
-  // True when the checkpoint completed successfully.
-  bool success = 1;
-
-  // Opaque identifier for the checkpoint.
-  string path = 2;
-
-  // Upstream sequence number recorded with the checkpoint.
-  uint64 last_cdc_offset = 3;
-}
-
-// GetRecoveryStateRequest fetches coarse recovery / sizing state.
-message GetRecoveryStateRequest {}
-
-// GetRecoveryStateResponse exposes coarse index metrics.
-message GetRecoveryStateResponse {
-  // Last upstream sequence number recorded by SetCdcOffset.
-  uint64 last_cdc_offset = 1;
-
-  // Live indexed entity count across all tenants.
-  uint64 indexed_count = 2;
-
-  // Internal sizing metric. Operator use.
-  uint32 chunk_count = 3;
-
-  // Writes since the last successful checkpoint.
-  uint64 mutations_since_snapshot = 4;
-
-  // True when the tenant's index must be rebuilt from the primary store before
-  // it can serve queries. While set, Search returns UNAVAILABLE.
-  // last_cdc_offset is NOT a resume cursor in this state.
-  bool needs_full_reindex = 5;
-}
-
-// SetCdcOffsetRequest records the last applied upstream sequence number.
-message SetCdcOffsetRequest {
-  // Monotonic upstream sequence number.
-  uint64 offset = 1;
-}
-
-// SetCdcOffsetResponse acknowledges the update.
-message SetCdcOffsetResponse {
-  // True when the offset was stored.
-  bool success = 1;
 }

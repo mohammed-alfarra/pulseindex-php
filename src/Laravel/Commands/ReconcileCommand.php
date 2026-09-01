@@ -24,7 +24,7 @@ final class ReconcileCommand extends Command
     protected $signature = 'pulse:reconcile
         {model?* : Model FQCNs. Default: pulseindex.searchable_models.}
         {--tenant=* : Tenants. Default: discovered per model.}
-        {--full : Skip the cheap grand-total gate; always diff.}
+        {--full : Deprecated; the sweep always runs and this flag does nothing.}
         {--apply : Enqueue markers (default: report only).}
         {--force : Apply past the orphan-count brake.}';
 
@@ -37,8 +37,7 @@ final class ReconcileCommand extends Command
             return self::FAILURE;
         }
 
-        // Via the health service, not getRecoveryState(): that call is
-        // operator-only, so this command aborted outright for every customer.
+        // Readiness comes from the health service, which needs no scope.
         if ($client->servingStatus() !== ServingStatus::SERVING) {
             $this->error('Engine is not serving (degraded recovery). Run pulse:reindex --recovery first.');
 
@@ -62,11 +61,9 @@ final class ReconcileCommand extends Command
             }
         }
 
-        if (!$this->option('full') && $this->grandTotalsMatch($client, $targets)) {
-            $this->info('Grand totals match the engine — likely in sync (use --full to diff anyway).');
-
-            return self::SUCCESS;
-        }
+        // The shortcut that compared grand totals before sweeping is gone: it
+        // needed an index-wide count that only an operator key can read. Every
+        // run now walks the models, which is slower and gives the same answer.
 
         /** @var list<ReconcileDiff> $diffs */
         $diffs = [];
@@ -149,19 +146,6 @@ final class ReconcileCommand extends Command
         return $opt !== [] ? $opt : $reconciler->tenantsFor($model);
     }
 
-    /**
-     * @param list<array{0: class-string, 1: string}> $targets
-     */
-    private function grandTotalsMatch(ClientInterface $client, array $targets): bool
-    {
-        $db = 0;
-        foreach ($targets as [$model, $tenant]) {
-            $instance = $model::query()->getModel();
-            $db += (int) $model::query()->tap(fn ($q) => $instance->pulseReconcileScope($q, $tenant))->count();
-        }
-
-        return $db === $client->getRecoveryState()->indexedCount;
-    }
 
     /**
      * @param list<ReconcileDiff> $diffs

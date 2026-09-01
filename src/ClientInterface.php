@@ -30,13 +30,9 @@ interface ClientInterface
 
     public function search(QueryBuilder $query): SearchResult;
 
-    public function getRecoveryState(): RecoveryState;
-
     /**
-     * Serving status from `grpc.health.v1.Health`, which the engine serves
-     * without authentication. Unlike {@see getRecoveryState()}, this
-     * needs no scope — that RPC requires `admin`, which the engine refuses to
-     * every customer key.
+     * Serving status from `grpc.health.v1.Health`. Needs no particular scope,
+     * so it works with any key.
      *
      * @return int one of \Grpc\Health\V1\HealthCheckResponse\ServingStatus
      */

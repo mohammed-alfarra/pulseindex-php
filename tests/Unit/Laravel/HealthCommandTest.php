@@ -13,7 +13,6 @@ use PulseIndex\Client;
 use PulseIndex\ClientInterface;
 use PulseIndex\Exception\GrpcException;
 use PulseIndex\Laravel\PulseIndexServiceProvider;
-use PulseIndex\RecoveryState;
 use PulseIndex\Tests\Concerns\CreatesOutboxTable;
 use PulseIndex\Tests\Fixtures\Property;
 
@@ -41,41 +40,14 @@ final class HealthCommandTest extends TestCase
         $this->createOutboxTable();
     }
 
-    public function test_engine_is_reachable_even_when_the_key_may_not_read_recovery_state(): void
-    {
-        // The regression this was rewritten for. getRecoveryState() is
-        // operator-only and customer keys may not call it, so the old command
-        // reported a perfectly healthy service as
-        // UNREACHABLE for every customer — the catch could not tell "denied"
-        // from "down".
-        $client = $this->createMock(ClientInterface::class);
-        $client->method('servingStatus')->willReturn(1);
-        $client->method('getRecoveryState')
-            ->willThrowException(new GrpcException('insufficient scope', 7));
-        $this->app->instance(ClientInterface::class, $client);
-        $this->app->instance(Client::class, $client);
-
-        $this->artisan('pulse:health --json')
-            ->assertExitCode(0)
-            ->expectsOutputToContain('engine_reachable');
-    }
-
-    private function engine(bool $reachable = true, bool $needsFullReindex = false, int $indexed = 5): ClientInterface
+    private function engine(bool $reachable = true, bool $needsFullReindex = false): ClientInterface
     {
         $client = $this->createMock(ClientInterface::class);
-        // Reachability and degradation now come from the health service, which
-        // needs no scope. GetRecoveryState stays mocked because the command
-        // still asks it for the index size — but only as a nicety, and never in
-        // a way that can mark a reachable engine as down.
+        // Readiness comes from the health service, which needs no scope.
         if ($reachable) {
             $client->method('servingStatus')->willReturn($needsFullReindex ? 2 : 1);
-            $client->method('getRecoveryState')->willReturn(new RecoveryState(
-                lastCdcOffset: 0, indexedCount: $indexed, chunkCount: 0,
-                mutationsSinceSnapshot: 0, needsFullReindex: $needsFullReindex,
-            ));
         } else {
             $client->method('servingStatus')->willThrowException(new GrpcException('connection refused', 14));
-            $client->method('getRecoveryState')->willThrowException(new GrpcException('connection refused', 14));
         }
         $this->app->instance(ClientInterface::class, $client);
         $this->app->instance(Client::class, $client);
@@ -107,19 +79,20 @@ final class HealthCommandTest extends TestCase
 
     public function test_json_shape(): void
     {
-        $this->engine(indexed: 7);
+        $this->engine();
         $exit = $this->artisan('pulse:health', ['--json' => true])->run();
         self::assertSame(0, $exit);
     }
 
     public function test_json_output_is_valid_json_with_the_expected_keys(): void
     {
-        $this->engine(indexed: 7);
+        $this->engine();
         \Illuminate\Support\Facades\Artisan::call('pulse:health', ['--json' => true]);
         $payload = json_decode(\Illuminate\Support\Facades\Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
 
         self::assertTrue($payload['healthy']);
-        self::assertSame(7, $payload['engine']['indexed_count']);
+        // No operator key, so the command cannot read the index size.
+        self::assertNull($payload['engine']['indexed_count']);
         self::assertFalse($payload['engine']['needs_full_reindex']);
         self::assertArrayHasKey('oldest_pending_seconds', $payload['outbox']);
         self::assertIsArray($payload['checks']);

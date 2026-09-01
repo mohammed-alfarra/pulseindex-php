@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PulseIndex\Laravel\Commands;
 
+use Grpc\Health\V1\HealthCheckResponse\ServingStatus;
 use Illuminate\Console\Command;
 use PulseIndex\AdminHttpClient;
 use PulseIndex\ClientInterface;
@@ -56,13 +57,15 @@ final class ReindexCommand extends Command
         }
 
         if ($recovery) {
-            if (!$client->getRecoveryState()->needsFullReindex) {
-                $this->error('Engine is not in degraded recovery (needs_full_reindex is false). '
+            // A service that is serving does not need a recovery rebuild, and
+            // running one anyway would re-push everything for nothing.
+            if ($client->servingStatus() === ServingStatus::SERVING) {
+                $this->error('The service is serving normally. '
                     . 'Run without --recovery for a normal rebuild.');
 
                 return self::FAILURE;
             }
-            $this->warn('Engine is in degraded recovery — rebuilding every configured model, then clearing the flag.');
+            $this->warn('The service is not serving — rebuilding every configured model.');
         }
 
         $enqueued = $this->enqueue($targets, $chunk);

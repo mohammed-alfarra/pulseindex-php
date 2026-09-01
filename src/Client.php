@@ -10,7 +10,6 @@ use PulseIndex\Engine\V1\DeleteEntityRequest;
 use Grpc\Health\V1\HealthCheckRequest;
 use Grpc\Health\V1\HealthCheckResponse\ServingStatus;
 use Grpc\Health\V1\HealthClient;
-use PulseIndex\Engine\V1\GetRecoveryStateRequest;
 use PulseIndex\Engine\V1\IndexEntityRequest;
 use PulseIndex\Engine\V1\SearchEngineServiceClient;
 use PulseIndex\Exception\GrpcException;
@@ -100,9 +99,6 @@ final class Client implements ClientInterface
      * named service whenever it enters or leaves degraded recovery.
      *
      * No credential is sent, and none is needed: the engine adds this service
-     * without authentication. That is the point — getRecoveryState(), the
-     * only other readiness signal, is operator-only and customer keys are not
-     * permitted to make it.
      *
      * @return int one of \Grpc\Health\V1\HealthCheckResponse\ServingStatus
      */
@@ -274,21 +270,6 @@ final class Client implements ClientInterface
         );
     }
 
-    public function getRecoveryState(): RecoveryState
-    {
-        /** @var \PulseIndex\Engine\V1\GetRecoveryStateResponse $response */
-        $response = $this->unary(
-            $this->stub->GetRecoveryState(new GetRecoveryStateRequest(), $this->metadata)
-        );
-
-        return new RecoveryState(
-            lastCdcOffset: (int) $response->getLastCdcOffset(),
-            indexedCount: (int) $response->getIndexedCount(),
-            chunkCount: (int) $response->getChunkCount(),
-            mutationsSinceSnapshot: (int) $response->getMutationsSinceSnapshot(),
-            needsFullReindex: (bool) $response->getNeedsFullReindex(),
-        );
-    }
 
     /**
      * @param mixed $call Result of a *_simpleRequest unary call (array{0: Message, 1: object}|object)

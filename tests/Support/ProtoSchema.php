@@ -171,4 +171,52 @@ final class ProtoSchema
         }
         throw new \RuntimeException('unbalanced braces in engine.proto');
     }
+
+    /**
+     * Check that $vendored is a faithful subset of $engine.
+     *
+     * The published proto deliberately omits the operator RPCs — no key the
+     * dashboard issues can call them — so equality is the wrong test. What
+     * matters is that everything the client declares matches the service
+     * exactly, and that it never declares something the service lacks.
+     *
+     * @return list<string>
+     */
+    public static function subsetDiff(self $engine, self $vendored): array
+    {
+        $out = [];
+
+        foreach ($vendored->rpcs as $rpc) {
+            if (!in_array($rpc, $engine->rpcs, true)) {
+                $out[] = "+ rpc not in the engine: {$rpc}";
+            }
+        }
+
+        foreach ($vendored->messages as $name => $mine) {
+            $theirs = $engine->messages[$name] ?? null;
+            if ($theirs === null) {
+                $out[] = "+ message not in the engine: {$name}";
+                continue;
+            }
+            foreach ($mine as $f) {
+                if (!in_array($f, $theirs, true)) {
+                    $out[] = "+ {$name}: {$f} is not in the engine";
+                }
+            }
+            foreach ($theirs as $f) {
+                if (!in_array($f, $mine, true)) {
+                    $out[] = "- {$name}: lost {$f}";
+                }
+            }
+        }
+
+        foreach ($vendored->enums as $name => $mine) {
+            $theirs = $engine->enums[$name] ?? [];
+            if (implode(',', $mine) !== implode(',', $theirs)) {
+                $out[] = "~ enum {$name}: engine [" . implode(',', $theirs) . "] vs vendored [" . implode(',', $mine) . ']';
+            }
+        }
+
+        return $out;
+    }
 }

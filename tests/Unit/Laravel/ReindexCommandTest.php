@@ -14,7 +14,6 @@ use PulseIndex\ClientInterface;
 use PulseIndex\Exception\PulseIndexException;
 use PulseIndex\Laravel\PulseIndexServiceProvider;
 use PulseIndex\Laravel\PulseSync;
-use PulseIndex\RecoveryState;
 use PulseIndex\Tests\Concerns\CreatesOutboxTable;
 use PulseIndex\Tests\Fixtures\Property;
 use RuntimeException;
@@ -54,9 +53,11 @@ final class ReindexCommandTest extends TestCase
         $this->createOutboxTable();
     }
 
-    private function fakeClient(): ClientInterface
+    /** @param bool $serving false puts the service in the state --recovery requires. */
+    private function fakeClient(bool $serving = true): ClientInterface
     {
         $client = $this->createMock(ClientInterface::class);
+        $client->method('servingStatus')->willReturn($serving ? 1 : 2);
         $this->app->instance(ClientInterface::class, $client);
         $this->app->instance(Client::class, $client);
 
@@ -71,13 +72,6 @@ final class ReindexCommandTest extends TestCase
         return $admin;
     }
 
-    private function state(bool $needsFullReindex): RecoveryState
-    {
-        return new RecoveryState(
-            lastCdcOffset: 0, indexedCount: 0, chunkCount: 0,
-            mutationsSinceSnapshot: 0, needsFullReindex: $needsFullReindex,
-        );
-    }
 
     private function makeRows(int $n): void
     {
@@ -100,7 +94,6 @@ final class ReindexCommandTest extends TestCase
 
             return count($e);
         });
-        $client->expects(self::never())->method('getRecoveryState');
         $admin->expects(self::never())->method('markReindexComplete');
 
         $this->artisan('pulse:reindex', ['model' => Property::class])->assertExitCode(0);
@@ -112,7 +105,7 @@ final class ReindexCommandTest extends TestCase
     public function test_async_only_enqueues(): void
     {
         $this->makeRows(2);
-        $client = $this->fakeClient();
+        $client = $this->fakeClient(serving: false);
         $this->fakeAdmin();
         $client->expects(self::never())->method('batchIndex');
 
@@ -124,10 +117,9 @@ final class ReindexCommandTest extends TestCase
     public function test_recovery_drains_then_marks_complete(): void
     {
         $this->makeRows(2);
-        $client = $this->fakeClient();
+        $client = $this->fakeClient(serving: false);
         $admin = $this->fakeAdmin();
 
-        $client->method('getRecoveryState')->willReturn($this->state(true));
         $client->expects(self::atLeastOnce())->method('batchIndex')->willReturn(2);
         $admin->expects(self::once())->method('markReindexComplete');
 
@@ -140,7 +132,6 @@ final class ReindexCommandTest extends TestCase
         $client = $this->fakeClient();
         $admin = $this->fakeAdmin();
 
-        $client->method('getRecoveryState')->willReturn($this->state(false));
         $client->expects(self::never())->method('batchIndex');
         $admin->expects(self::never())->method('markReindexComplete');
 
@@ -149,9 +140,8 @@ final class ReindexCommandTest extends TestCase
 
     public function test_recovery_rejects_a_model_argument(): void
     {
-        $client = $this->fakeClient();
+        $client = $this->fakeClient(serving: false);
         $admin = $this->fakeAdmin();
-        $client->expects(self::never())->method('getRecoveryState');
         $admin->expects(self::never())->method('markReindexComplete');
 
         $this->artisan('pulse:reindex', ['model' => Property::class, '--recovery' => true])->assertFailed();
@@ -161,10 +151,9 @@ final class ReindexCommandTest extends TestCase
     {
         config()->set('pulseindex.outbox.max_attempts', 1);
         $this->makeRows(3);
-        $client = $this->fakeClient();
+        $client = $this->fakeClient(serving: false);
         $admin = $this->fakeAdmin();
 
-        $client->method('getRecoveryState')->willReturn($this->state(true));
         $client->method('batchIndex')->willThrowException(new RuntimeException('engine RESOURCE_EXHAUSTED'));
         $admin->expects(self::never())->method('markReindexComplete');
 
@@ -178,10 +167,9 @@ final class ReindexCommandTest extends TestCase
     public function test_completion_call_failure_is_reported_as_failure(): void
     {
         $this->makeRows(2);
-        $client = $this->fakeClient();
+        $client = $this->fakeClient(serving: false);
         $admin = $this->fakeAdmin();
 
-        $client->method('getRecoveryState')->willReturn($this->state(true));
         $client->method('batchIndex')->willReturn(2);
         $admin->method('markReindexComplete')->willThrowException(
             new PulseIndexException('engine reports the index is still empty; nothing was indexed'),

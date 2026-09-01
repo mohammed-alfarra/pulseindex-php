@@ -12,7 +12,6 @@ use PulseIndex\Client;
 use PulseIndex\ClientInterface;
 use PulseIndex\Laravel\PulseIndexServiceProvider;
 use PulseIndex\QueryBuilder;
-use PulseIndex\RecoveryState;
 use PulseIndex\SearchResult;
 use PulseIndex\Tests\Concerns\CreatesOutboxTable;
 use PulseIndex\Tests\Fixtures\Property;
@@ -56,13 +55,7 @@ final class ReconcileCommandTest extends TestCase
     private function client(int $indexedCount, array $engineIds, bool $needsFullReindex = false): ClientInterface
     {
         $client = $this->createMock(ClientInterface::class);
-        // The degraded gate reads the health service, not GetRecoveryState:
-        // that RPC needs `admin`, which customer keys never hold.
         $client->method('servingStatus')->willReturn($needsFullReindex ? 2 : 1);
-        $client->method('getRecoveryState')->willReturn(new RecoveryState(
-            lastCdcOffset: 0, indexedCount: $indexedCount, chunkCount: 0,
-            mutationsSinceSnapshot: 0, needsFullReindex: $needsFullReindex,
-        ));
         $client->method('search')->willReturnCallback(function (QueryBuilder $q) use ($engineIds): SearchResult {
             $req = $q->toRequest();
             $slice = array_slice($engineIds, $req->getOffset(), $req->getLimit());
@@ -82,15 +75,6 @@ final class ReconcileCommandTest extends TestCase
                 Property::query()->create(['status' => 'open', 'price' => $i]);
             }
         });
-    }
-
-    public function test_cheap_gate_skips_the_sweep_when_grand_totals_match(): void
-    {
-        $this->seedProps(3);
-        $client = $this->client(indexedCount: 3, engineIds: [1, 2, 3]);
-        $client->expects(self::never())->method('search');   // gate short-circuits
-
-        $this->artisan('pulse:reconcile')->assertExitCode(0);
     }
 
     public function test_dry_run_reports_drift_and_exits_non_zero(): void
