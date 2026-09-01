@@ -31,15 +31,20 @@ use PulseIndex\Tests\Support\ProtoSchema;
 
 /** php_* options are local to this SDK and are never present upstream. */
 $normalise = static function (string $text, bool $forHash = false): string {
+    // Comments never reach the generated stubs, and the vendored copy's are
+    // deliberately shorter than the engine's because this file is published.
+    $text = (string) preg_replace('~//.*~', '', $text);
     $lines = preg_split('~\R~', $text) ?: [];
     $kept = array_filter($lines, static function (string $l) use ($forHash): bool {
         if (preg_match('~^\s*option\s+php_~', $l) === 1) {
             return false;
         }
 
-        // The baseline hash is computed over the same normalisation
-        // scripts/compile-proto.sh uses: php_* options and blank lines dropped.
-        return !$forHash || trim($l) !== '';
+        // Blank lines go in both paths. Stripping comments above turns every
+        // comment-only line into an empty one, and the two files carry
+        // different amounts of prose by design — so keeping blanks would
+        // compare documentation volume rather than declarations.
+        return trim($l) !== '';
     });
 
     $joined = implode("\n", $kept);
@@ -144,9 +149,10 @@ if ($diff !== []) {
 
 if ($normalise($engineText) !== $normalise($vendorText)) {
     echo "ok: schema matches the engine ({$source})\n";
-    echo "warning: the files differ textually (comments or ordering) though the schema\n";
-    echo "         is identical. Re-sync when convenient: composer build-proto\n";
+    echo "warning: the files differ in layout (field ordering or formatting) beyond\n";
+    echo "         comments. Re-sync the declarations, keeping the vendored comments.\n";
     exit(0);
 }
 
-echo "ok: vendored proto is identical to the engine ({$source})\n";
+echo "ok: vendored proto matches the engine, declaration for declaration ({$source})\n";
+echo "    comments differ by design — the vendored copy is published.\n";

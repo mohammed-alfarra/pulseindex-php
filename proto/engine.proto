@@ -2,57 +2,53 @@
 //
 // Package: pulseindex.engine.v1
 //
-// This is the sole wire contract for the PulseIndex Rust core engine.
-// External client SDKs (Go, TypeScript, Python, etc.) SHOULD generate stubs
-// directly from this file. The engine stores no entity payloads — only
-// bitwise indexes — and returns matched entity IDs for the caller to hydrate
-// from a primary data store.
+// The wire contract for the PulseIndex service. Client SDKs generate stubs
+// directly from this file. Queries return matching entity IDs, which the caller
+// hydrates from its own primary data store — record contents are never sent
+// here and are never stored by the service.
 //
 // Authentication (transport metadata, not proto fields):
 //   - Header `x-api-key: <key>`  OR
 //   - Header `authorization: Bearer <key>`
-//   Valid keys are configured on the server via `PULSEINDEX_API_KEYS`.
+//   Keys are issued and revoked from the PulseIndex dashboard.
 //
 // Multi-tenancy:
 //   Every mutating / query RPC that touches index state carries `tenant_id`.
 //   Empty `tenant_id` is normalized server-side to `"default"`. Tenants are
-//   fully isolated (separate in-memory bitset spaces).
+//   fully isolated from one another.
 //
 syntax = "proto3";
 
 package pulseindex.engine.v1;
 
-option php_namespace = "PulseIndex\\Engine\\V1";
-option php_metadata_namespace = "GPBMetadata\\PulseIndex";
-
 // SearchEngineService is the primary PulseIndex control and query plane.
 service SearchEngineService {
-  // IndexEntity upserts a single entity into the tenant's in-memory bit index.
+  // IndexEntity upserts a single entity into the tenant's index.
   // Re-indexing the same entity_id within a tenant refreshes its attribute bits
-  // and clears any soft-delete (tombstone) for that id.
+  // and clears any soft-delete for that id.
   rpc IndexEntity (IndexEntityRequest) returns (IndexEntityResponse);
 
   // BatchIndexEntities indexes many entities in one RPC.
   // Processing is ordered; capacity / auth failures abort the batch.
   rpc BatchIndexEntities (BatchIndexEntitiesRequest) returns (BatchIndexEntitiesResponse);
 
-  // DeleteEntity soft-deletes an entity inside a tenant (tombstone).
+  // DeleteEntity soft-deletes an entity inside a tenant.
   // The entity id is excluded from subsequent Search results for that tenant.
   rpc DeleteEntity (DeleteEntityRequest) returns (DeleteEntityResponse);
 
-  // Search runs bitwise filter cascades (MUST / SHOULD / MUST_NOT) plus optional
+  // Search applies the boolean filters (MUST / SHOULD / MUST_NOT) plus optional
   // numeric range predicates and returns matching entity IDs only.
   // When `limit` > 0 the engine may early-exit for microsecond latency and
   // `total_matches` reflects the scanned page path (exact totals when limit == 0).
   rpc Search (SearchQueryRequest) returns (SearchQueryResponse);
 
-  // CreateSnapshot forces an immediate binary mmap snapshot to disk.
+  // CreateSnapshot forces an immediate durable checkpoint. Operator use.
   rpc CreateSnapshot (CreateSnapshotRequest) returns (CreateSnapshotResponse);
 
-  // GetRecoveryState returns CDC offset and coarse index sizing metrics.
+  // GetRecoveryState returns coarse index metrics. Operator use.
   rpc GetRecoveryState (GetRecoveryStateRequest) returns (GetRecoveryStateResponse);
 
-  // SetCdcOffset records the last applied CDC / mutation sequence number so
+  // SetCdcOffset records the last applied upstream sequence number so
   // cold-boot recovery can resume from the correct upstream offset.
   rpc SetCdcOffset (SetCdcOffsetRequest) returns (SetCdcOffsetResponse);
 }
@@ -61,8 +57,9 @@ service SearchEngineService {
 // Indexing
 // ---------------------------------------------------------------------------
 
-// IndexEntityRequest describes a single entity to upsert into the bit index.
-// No textual payload (name, description, PII) is stored by the engine.
+// IndexEntityRequest describes a single entity to upsert.
+// No record content (name, description, PII) is sent or stored — only the
+// attributes you want to filter on.
 message IndexEntityRequest {
   // Stable application-level entity identifier (e.g. listing id).
   // Mapped into chunk = entity_id / 8192, local_offset = entity_id % 8192.
@@ -111,14 +108,14 @@ message BatchIndexEntitiesResponse {
 
 // DeleteEntityRequest soft-deletes one entity within a tenant.
 message DeleteEntityRequest {
-  // Entity id to tombstone.
+  // Entity id to delete.
   uint64 entity_id = 1;
 
   // Tenant that owns the entity. Empty → "default".
   string tenant_id = 2;
 }
 
-// DeleteEntityResponse reports whether a live entity was tombstoned.
+// DeleteEntityResponse reports whether a live entity was deleted.
 message DeleteEntityResponse {
   // True if the entity was present and marked deleted; false if unknown / already deleted.
   bool success = 1;
@@ -130,17 +127,17 @@ message DeleteEntityResponse {
 
 // FilterPredicate is a categorical / attribute filter in the cascade pipeline.
 message FilterPredicate {
-  // Boolean combination semantics relative to the working bitset.
+  // How this predicate combines with the matches accumulated so far.
   enum Operation {
-    // Conjunction: working := working AND attribute_bitset
+    // Conjunction: narrows the current match set.
     MUST = 0;
-    // Disjunction group: all SHOULD predicates are OR'd, then AND'd into working
+    // Disjunction group: SHOULD predicates are OR'd, then narrow the match set.
     SHOULD = 1;
-    // Exclusion: working := working AND NOT attribute_bitset
+    // Exclusion: removes matches carrying this attribute.
     MUST_NOT = 2;
   }
 
-  // How this predicate combines with the working match set.
+  // How this predicate combines with the current match set.
   Operation op = 1;
 
   // Attribute token identical to those used at index time, e.g. "feature:pool".
@@ -203,56 +200,54 @@ message SearchQueryResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Persistence / CDC control
+// Operator control plane
 // ---------------------------------------------------------------------------
 
-// CreateSnapshotRequest triggers an immediate durable snapshot flush.
+// CreateSnapshotRequest triggers an immediate durable checkpoint.
 message CreateSnapshotRequest {}
 
-// CreateSnapshotResponse reports snapshot location and CDC watermark.
+// CreateSnapshotResponse acknowledges the checkpoint.
 message CreateSnapshotResponse {
-  // True when the snapshot file was written successfully.
+  // True when the checkpoint completed successfully.
   bool success = 1;
 
-  // Filesystem path of the snapshot written by the engine.
+  // Opaque identifier for the checkpoint.
   string path = 2;
 
-  // CDC / mutation sequence number stored inside the snapshot header.
+  // Upstream sequence number recorded with the checkpoint.
   uint64 last_cdc_offset = 3;
 }
 
 // GetRecoveryStateRequest fetches coarse recovery / sizing state.
 message GetRecoveryStateRequest {}
 
-// GetRecoveryStateResponse exposes snapshot-oriented engine metrics.
+// GetRecoveryStateResponse exposes coarse index metrics.
 message GetRecoveryStateResponse {
-  // Last CDC offset recorded by SetCdcOffset / snapshot header.
+  // Last upstream sequence number recorded by SetCdcOffset.
   uint64 last_cdc_offset = 1;
 
-  // Live indexed entity count across all tenants (excludes tombstones).
+  // Live indexed entity count across all tenants.
   uint64 indexed_count = 2;
 
   // Total chunk structures currently allocated across tenants.
   uint32 chunk_count = 3;
 
-  // Mutations since the last successful snapshot flush.
+  // Writes since the last successful checkpoint.
   uint64 mutations_since_snapshot = 4;
 
-  // True when both snapshot generations were lost at cold boot. The index is
-  // empty, Search returns UNAVAILABLE, and the ingestion pipeline must re-push
-  // every live entity from the primary store, then call
-  // POST /recovery/reindex-complete on the admin port. last_cdc_offset is NOT a
-  // recovery cursor and must not be used to resume from a partial state.
+  // True when the tenant's index must be rebuilt from the primary store before
+  // it can serve queries. While set, Search returns UNAVAILABLE.
+  // last_cdc_offset is NOT a resume cursor in this state.
   bool needs_full_reindex = 5;
 }
 
-// SetCdcOffsetRequest updates the engine's CDC watermark.
+// SetCdcOffsetRequest records the last applied upstream sequence number.
 message SetCdcOffsetRequest {
-  // Monotonic upstream CDC / binlog / change-stream sequence number.
+  // Monotonic upstream sequence number.
   uint64 offset = 1;
 }
 
-// SetCdcOffsetResponse acknowledges the watermark update.
+// SetCdcOffsetResponse acknowledges the update.
 message SetCdcOffsetResponse {
   // True when the offset was stored.
   bool success = 1;

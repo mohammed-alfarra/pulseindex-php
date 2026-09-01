@@ -131,8 +131,8 @@ php artisan pulse:reindex "App\Models\Property"
 # Rebuild every configured model
 php artisan pulse:reindex
 
-# After a needs_full_reindex alert (total snapshot loss on the engine):
-#   rebuilds every model, drains, then POSTs /recovery/reindex-complete
+# After the service reports that a tenant's index must be rebuilt:
+#   rebuilds every model, drains, then clears the flag
 php artisan pulse:reindex --recovery
 
 # enqueue only; let pulse:outbox:work drain
@@ -146,7 +146,7 @@ php artisan pulse:reindex --async
 | `admin_port` | `PULSEINDEX_ADMIN_PORT` | default `8081` |
 | `internal_token` | `PULSEINDEX_ENGINE_INTERNAL_TOKEN` | required for `--recovery` |
 
-`--recovery` aborts if the engine reports `needs_full_reindex == false`, or if any marker
+`--recovery` aborts if the service does not report a rebuild as required, or if any marker
 lands in `failed_at` — **without** clearing the flag. See
 [`pulseindex-engine/docs/ingestion-recovery.md`](../pulseindex-engine/docs/ingestion-recovery.md).
 
@@ -208,23 +208,22 @@ $schedule->command('pulse:health')->everyFiveMinutes();   // + alert on non-zero
 | `PULSEINDEX_HEALTH_MAX_PENDING` | `10000` | outbox backlog exceeds this |
 | `PULSEINDEX_HEALTH_MAX_LAG` | `300` | oldest pending marker is older than this (seconds) |
 
-Also unhealthy: engine unreachable, or the engine not serving.
+Also unhealthy: the service is unreachable, or reports that it is not serving.
 
 ### Readiness comes from the gRPC health service
 
-Reachability and degraded recovery are read from `grpc.health.v1.Health`, which
-the engine serves **without** its auth interceptor — no scope required, and no
-credential sent.
+Readiness is read from the standard `grpc.health.v1.Health` protocol, which
+requires no particular scope and sends no credential.
 
-This matters, and it is not an implementation detail. `GetRecoveryState`, the
-obvious place to ask, requires the `admin` scope, and the engine refuses `admin`
-to any key bound to a tenant — every key the dashboard issues. Before 2.0.0 both
-`pulse:health` and `pulse:reconcile` asked it anyway, so a perfectly healthy
-engine was reported unreachable for every customer.
+This is worth knowing rather than treating as an implementation detail. The
+obvious place to ask is an operator-only call that customer API keys are not
+permitted to make. Before 2.0.0 both `pulse:health` and `pulse:reconcile` asked
+it anyway, so a perfectly healthy service was reported unreachable for every
+customer.
 
 `pulse:health` still reports `indexed_count` when the key is allowed to read it,
-but only after reachability has been decided. A key that cannot read the number
-no longer makes the engine look down.
+but only after readiness has been decided. A key that cannot read the number no
+longer makes the service look down.
 
 The same signal is on the client directly:
 
@@ -236,8 +235,8 @@ $client->servingStatus();                // int  — '' is the whole server
 $client->servingStatus('pulseindex.engine.v1.SearchEngineService');
 ```
 
-`health()` returns `false` rather than throwing, so unreachable and degraded
-look alike; use `servingStatus()` to tell them apart.
+`health()` returns `false` rather than throwing, so unreachable and
+not-currently-serving look alike; use `servingStatus()` to tell them apart.
 
 ## Keeping the proto in sync
 

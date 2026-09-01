@@ -220,7 +220,14 @@ fi
 
 # Record a normalised hash so scripts/check-proto.sh can detect hand-edits to the
 # vendored proto that were not produced by this script.
-grep -vE '^[[:space:]]*(option php_|$)' "${PROTO_FILE}" | shasum -a 256 | awk '{print $1}' \
+# Comments are stripped from the hash basis: this pin exists to catch a proto
+# edited without regenerating the stubs, and comments do not reach the stubs.
+# The vendored copy is published, so its comments are deliberately shorter than
+# the engine's — hashing them would fail on every doc edit and teach everyone to
+# regenerate without reading why.
+sed -E 's://.*::' "${PROTO_FILE}" \
+  | grep -vE '^[[:space:]]*(option php_|$)' \
+  | shasum -a 256 | awk '{print $1}' \
   > "${PROTO_DIR}/engine.proto.sha256"
 
 echo "Proto compile complete → ${OUT_DIR}"

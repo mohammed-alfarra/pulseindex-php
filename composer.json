@@ -1,6 +1,6 @@
 {
     "name": "pulseindex/pulseindex-php",
-    "description": "Official PHP client SDK for the PulseIndex bitwise search engine",
+    "description": "Official PHP client SDK for PulseIndex \u2014 hosted search and filtering for large entity sets",
     "type": "library",
     "license": "MIT",
     "keywords": [

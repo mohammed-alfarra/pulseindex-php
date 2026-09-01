@@ -29,11 +29,10 @@ public function health(): bool
 }
 ```
 
-### `pulse:health` reported healthy engines as unreachable
+### `pulse:health` reported a healthy service as unreachable
 
-Both console commands read `GetRecoveryState`, which requires the `admin` scope.
-The engine refuses `admin` to any key bound to a tenant — every key the
-PulseIndex dashboard issues — so the call came back `PERMISSION_DENIED`.
+Both console commands used an operator-only call that customer API keys are not
+permitted to make, so it came back `PERMISSION_DENIED`.
 
 `pulse:health` caught that and reported `engine_reachable: false`. The engine
 was fine; the key was simply not allowed to ask. A single `catch` could not tell
@@ -41,10 +40,10 @@ was fine; the key was simply not allowed to ask. A single `catch` could not tell
 
 `pulse:reconcile` did not catch it at all and aborted before doing any work.
 
-Both now read `grpc.health.v1.Health`, which the engine serves without its auth
-interceptor — no scope needed. `pulse:health` still reports `indexed_count` when
-the key is allowed to read it, but that now happens **after** reachability has
-been decided, so failing to get the number no longer condemns the engine.
+Both now read the standard `grpc.health.v1.Health` protocol, which needs no
+particular scope. `pulse:health` still reports `indexed_count` when the key is
+allowed to read it, but that now happens **after** readiness has been decided,
+so failing to get the number no longer condemns the service.
 
 ### Added
 
