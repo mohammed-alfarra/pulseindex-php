@@ -21,11 +21,11 @@ syntax = "proto3";
 
 package pulseindex.engine.v1;
 
-// SearchEngineService is the primary PulseIndex control and query plane.
+// SearchEngineService is the PulseIndex query and indexing API.
 service SearchEngineService {
   // IndexEntity upserts a single entity into the tenant's index.
-  // Re-indexing the same entity_id within a tenant refreshes its attribute bits
-  // and clears any soft-delete for that id.
+  // Re-indexing the same entity_id within a tenant replaces its attributes and
+  // clears any soft-delete for that id.
   rpc IndexEntity (IndexEntityRequest) returns (IndexEntityResponse);
 
   // BatchIndexEntities indexes many entities in one RPC.
@@ -38,8 +38,8 @@ service SearchEngineService {
 
   // Search applies the boolean filters (MUST / SHOULD / MUST_NOT) plus optional
   // numeric range predicates and returns matching entity IDs only.
-  // When `limit` > 0 the engine may early-exit for microsecond latency and
-  // `total_matches` reflects the scanned page path (exact totals when limit == 0).
+  // When `limit` > 0, `total_matches` may be approximate; it is exact when
+  // `limit` is 0.
   rpc Search (SearchQueryRequest) returns (SearchQueryResponse);
 
   // CreateSnapshot forces an immediate durable checkpoint. Operator use.
@@ -48,8 +48,8 @@ service SearchEngineService {
   // GetRecoveryState returns coarse index metrics. Operator use.
   rpc GetRecoveryState (GetRecoveryStateRequest) returns (GetRecoveryStateResponse);
 
-  // SetCdcOffset records the last applied upstream sequence number so
-  // cold-boot recovery can resume from the correct upstream offset.
+  // SetCdcOffset records the last applied upstream sequence number so a restart
+  // can resume from the correct point. Operator use.
   rpc SetCdcOffset (SetCdcOffsetRequest) returns (SetCdcOffsetResponse);
 }
 
@@ -62,20 +62,20 @@ service SearchEngineService {
 // attributes you want to filter on.
 message IndexEntityRequest {
   // Stable application-level entity identifier (e.g. listing id).
-  // Mapped into chunk = entity_id / 8192, local_offset = entity_id % 8192.
+  // Dense, ascending ids index and query most efficiently.
   uint64 entity_id = 1;
 
-  // Optional location bitfield / geohash-style prefix used for coarse chunk
-  // skipping and exact `location:<prefix>` attribute membership.
+  // Optional geohash-style location prefix. Matches the `location_prefix`
+  // filter on Search, and `location:<prefix>` as an attribute.
   // Use 0 to omit location indexing.
   uint64 location_prefix = 2;
 
-  // Numeric price (or similar scalar) used for range binning and chunk min/max skip.
+  // Numeric price (or similar scalar), filterable through RangePredicate.
   uint32 price = 3;
 
   // Attribute tokens already namespaced by the client, e.g.:
   //   "feature:pool", "furnishing:full", "amenity:parking"
-  // Each string is hashed with xxHash3 into a bit-key inside the tenant space.
+  // Tokens are matched exactly; they are never stored as readable text.
   repeated string categories = 4;
 
   // Tenant / namespace isolation key. Empty string → server uses "default".
@@ -125,7 +125,7 @@ message DeleteEntityResponse {
 // Search predicates
 // ---------------------------------------------------------------------------
 
-// FilterPredicate is a categorical / attribute filter in the cascade pipeline.
+// FilterPredicate is a categorical / attribute filter.
 message FilterPredicate {
   // How this predicate combines with the matches accumulated so far.
   enum Operation {
@@ -144,7 +144,7 @@ message FilterPredicate {
   string attribute = 2;
 }
 
-// RangePredicate filters continuous numeric fields via logarithmic / fixed bins.
+// RangePredicate filters a continuous numeric field to an inclusive range.
 message RangePredicate {
   // Numeric field name. Currently supported: "price".
   string field = 1;
@@ -166,16 +166,15 @@ message SearchQueryRequest {
   // When non-zero, only entities indexed with that location_prefix match.
   uint64 location_prefix = 1;
 
-  // Ordered attribute predicates (MUST / SHOULD / MUST_NOT).
-  // MUST filters are evaluated most-selective-first internally.
+  // Attribute predicates (MUST / SHOULD / MUST_NOT). Order does not affect the
+  // result.
   repeated FilterPredicate filters = 2;
 
   // Optional numeric range filters (e.g. price between min_val and max_val).
   repeated RangePredicate ranges = 3;
 
   // Maximum number of entity IDs to return.
-  // 0 means no limit (and forces exact total_matches scanning).
-  // When > 0 the engine may early-exit after filling the page (µs hot path).
+  // 0 means no limit, and makes `total_matches` exact.
   uint32 limit = 4;
 
   // Number of matches to skip before collecting results (pagination).
@@ -191,11 +190,10 @@ message SearchQueryResponse {
   // Caller hydrates full records from the primary data store.
   repeated uint64 matched_entity_ids = 1;
 
-  // Total matches considered for this query path.
-  // Exact when limit == 0; may reflect early-exit semantics when limit > 0.
+  // Number of matches. Exact when `limit` is 0; may be approximate otherwise.
   uint32 total_matches = 2;
 
-  // Engine-side execution time in microseconds (excludes network RTT).
+  // Server-side execution time in microseconds (excludes network RTT).
   uint64 execution_time_us = 3;
 }
 
@@ -229,7 +227,7 @@ message GetRecoveryStateResponse {
   // Live indexed entity count across all tenants.
   uint64 indexed_count = 2;
 
-  // Total chunk structures currently allocated across tenants.
+  // Internal sizing metric. Operator use.
   uint32 chunk_count = 3;
 
   // Writes since the last successful checkpoint.

@@ -10,7 +10,7 @@ use Google\Protobuf\Internal\GPBUtil;
 use Google\Protobuf\RepeatedField;
 
 /**
- * FilterPredicate is a categorical / attribute filter in the cascade pipeline.
+ * FilterPredicate is a categorical / attribute filter.
  *
  * Generated from protobuf message <code>pulseindex.engine.v1.FilterPredicate</code>
  */

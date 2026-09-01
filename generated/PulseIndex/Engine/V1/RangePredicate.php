@@ -10,7 +10,7 @@ use Google\Protobuf\Internal\GPBUtil;
 use Google\Protobuf\RepeatedField;
 
 /**
- * RangePredicate filters continuous numeric fields via logarithmic / fixed bins.
+ * RangePredicate filters a continuous numeric field to an inclusive range.
  *
  * Generated from protobuf message <code>pulseindex.engine.v1.RangePredicate</code>
  */

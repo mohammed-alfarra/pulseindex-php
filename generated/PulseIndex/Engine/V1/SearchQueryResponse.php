@@ -24,14 +24,13 @@ class SearchQueryResponse extends \Google\Protobuf\Internal\Message
      */
     private $matched_entity_ids;
     /**
-     * Total matches considered for this query path.
-     * Exact when limit == 0; may reflect early-exit semantics when limit > 0.
+     * Number of matches. Exact when `limit` is 0; may be approximate otherwise.
      *
      * Generated from protobuf field <code>uint32 total_matches = 2;</code>
      */
     protected $total_matches = 0;
     /**
-     * Engine-side execution time in microseconds (excludes network RTT).
+     * Server-side execution time in microseconds (excludes network RTT).
      *
      * Generated from protobuf field <code>uint64 execution_time_us = 3;</code>
      */
@@ -47,10 +46,9 @@ class SearchQueryResponse extends \Google\Protobuf\Internal\Message
      *           Entity IDs that satisfied all predicates (after offset/limit).
      *           Caller hydrates full records from the primary data store.
      *     @type int $total_matches
-     *           Total matches considered for this query path.
-     *           Exact when limit == 0; may reflect early-exit semantics when limit > 0.
+     *           Number of matches. Exact when `limit` is 0; may be approximate otherwise.
      *     @type int|string $execution_time_us
-     *           Engine-side execution time in microseconds (excludes network RTT).
+     *           Server-side execution time in microseconds (excludes network RTT).
      * }
      */
     public function __construct($data = null)
@@ -88,8 +86,7 @@ class SearchQueryResponse extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Total matches considered for this query path.
-     * Exact when limit == 0; may reflect early-exit semantics when limit > 0.
+     * Number of matches. Exact when `limit` is 0; may be approximate otherwise.
      *
      * Generated from protobuf field <code>uint32 total_matches = 2;</code>
      * @return int
@@ -100,8 +97,7 @@ class SearchQueryResponse extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Total matches considered for this query path.
-     * Exact when limit == 0; may reflect early-exit semantics when limit > 0.
+     * Number of matches. Exact when `limit` is 0; may be approximate otherwise.
      *
      * Generated from protobuf field <code>uint32 total_matches = 2;</code>
      * @param int $var
@@ -116,7 +112,7 @@ class SearchQueryResponse extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Engine-side execution time in microseconds (excludes network RTT).
+     * Server-side execution time in microseconds (excludes network RTT).
      *
      * Generated from protobuf field <code>uint64 execution_time_us = 3;</code>
      * @return int|string
@@ -127,7 +123,7 @@ class SearchQueryResponse extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Engine-side execution time in microseconds (excludes network RTT).
+     * Server-side execution time in microseconds (excludes network RTT).
      *
      * Generated from protobuf field <code>uint64 execution_time_us = 3;</code>
      * @param int|string $var

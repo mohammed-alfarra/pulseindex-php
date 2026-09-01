@@ -20,21 +20,21 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
 {
     /**
      * Stable application-level entity identifier (e.g. listing id).
-     * Mapped into chunk = entity_id / 8192, local_offset = entity_id % 8192.
+     * Dense, ascending ids index and query most efficiently.
      *
      * Generated from protobuf field <code>uint64 entity_id = 1;</code>
      */
     protected $entity_id = 0;
     /**
-     * Optional location bitfield / geohash-style prefix used for coarse chunk
-     * skipping and exact `location:<prefix>` attribute membership.
+     * Optional geohash-style location prefix. Matches the `location_prefix`
+     * filter on Search, and `location:<prefix>` as an attribute.
      * Use 0 to omit location indexing.
      *
      * Generated from protobuf field <code>uint64 location_prefix = 2;</code>
      */
     protected $location_prefix = 0;
     /**
-     * Numeric price (or similar scalar) used for range binning and chunk min/max skip.
+     * Numeric price (or similar scalar), filterable through RangePredicate.
      *
      * Generated from protobuf field <code>uint32 price = 3;</code>
      */
@@ -42,7 +42,7 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
     /**
      * Attribute tokens already namespaced by the client, e.g.:
      *   "feature:pool", "furnishing:full", "amenity:parking"
-     * Each string is hashed with xxHash3 into a bit-key inside the tenant space.
+     * Tokens are matched exactly; they are never stored as readable text.
      *
      * Generated from protobuf field <code>repeated string categories = 4;</code>
      */
@@ -63,17 +63,17 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
      *
      *     @type int|string $entity_id
      *           Stable application-level entity identifier (e.g. listing id).
-     *           Mapped into chunk = entity_id / 8192, local_offset = entity_id % 8192.
+     *           Dense, ascending ids index and query most efficiently.
      *     @type int|string $location_prefix
-     *           Optional location bitfield / geohash-style prefix used for coarse chunk
-     *           skipping and exact `location:<prefix>` attribute membership.
+     *           Optional geohash-style location prefix. Matches the `location_prefix`
+     *           filter on Search, and `location:<prefix>` as an attribute.
      *           Use 0 to omit location indexing.
      *     @type int $price
-     *           Numeric price (or similar scalar) used for range binning and chunk min/max skip.
+     *           Numeric price (or similar scalar), filterable through RangePredicate.
      *     @type string[] $categories
      *           Attribute tokens already namespaced by the client, e.g.:
      *             "feature:pool", "furnishing:full", "amenity:parking"
-     *           Each string is hashed with xxHash3 into a bit-key inside the tenant space.
+     *           Tokens are matched exactly; they are never stored as readable text.
      *     @type string $tenant_id
      *           Tenant / namespace isolation key. Empty string → server uses "default".
      *           Two tenants may reuse the same entity_id without colliding.
@@ -87,7 +87,7 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
 
     /**
      * Stable application-level entity identifier (e.g. listing id).
-     * Mapped into chunk = entity_id / 8192, local_offset = entity_id % 8192.
+     * Dense, ascending ids index and query most efficiently.
      *
      * Generated from protobuf field <code>uint64 entity_id = 1;</code>
      * @return int|string
@@ -99,7 +99,7 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
 
     /**
      * Stable application-level entity identifier (e.g. listing id).
-     * Mapped into chunk = entity_id / 8192, local_offset = entity_id % 8192.
+     * Dense, ascending ids index and query most efficiently.
      *
      * Generated from protobuf field <code>uint64 entity_id = 1;</code>
      * @param int|string $var
@@ -114,8 +114,8 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Optional location bitfield / geohash-style prefix used for coarse chunk
-     * skipping and exact `location:<prefix>` attribute membership.
+     * Optional geohash-style location prefix. Matches the `location_prefix`
+     * filter on Search, and `location:<prefix>` as an attribute.
      * Use 0 to omit location indexing.
      *
      * Generated from protobuf field <code>uint64 location_prefix = 2;</code>
@@ -127,8 +127,8 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Optional location bitfield / geohash-style prefix used for coarse chunk
-     * skipping and exact `location:<prefix>` attribute membership.
+     * Optional geohash-style location prefix. Matches the `location_prefix`
+     * filter on Search, and `location:<prefix>` as an attribute.
      * Use 0 to omit location indexing.
      *
      * Generated from protobuf field <code>uint64 location_prefix = 2;</code>
@@ -144,7 +144,7 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Numeric price (or similar scalar) used for range binning and chunk min/max skip.
+     * Numeric price (or similar scalar), filterable through RangePredicate.
      *
      * Generated from protobuf field <code>uint32 price = 3;</code>
      * @return int
@@ -155,7 +155,7 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Numeric price (or similar scalar) used for range binning and chunk min/max skip.
+     * Numeric price (or similar scalar), filterable through RangePredicate.
      *
      * Generated from protobuf field <code>uint32 price = 3;</code>
      * @param int $var
@@ -172,7 +172,7 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
     /**
      * Attribute tokens already namespaced by the client, e.g.:
      *   "feature:pool", "furnishing:full", "amenity:parking"
-     * Each string is hashed with xxHash3 into a bit-key inside the tenant space.
+     * Tokens are matched exactly; they are never stored as readable text.
      *
      * Generated from protobuf field <code>repeated string categories = 4;</code>
      * @return RepeatedField<string>
@@ -185,7 +185,7 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
     /**
      * Attribute tokens already namespaced by the client, e.g.:
      *   "feature:pool", "furnishing:full", "amenity:parking"
-     * Each string is hashed with xxHash3 into a bit-key inside the tenant space.
+     * Tokens are matched exactly; they are never stored as readable text.
      *
      * Generated from protobuf field <code>repeated string categories = 4;</code>
      * @param string[] $var

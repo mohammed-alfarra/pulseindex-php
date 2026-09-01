@@ -24,7 +24,7 @@
 namespace PulseIndex\Engine\V1;
 
 /**
- * SearchEngineService is the primary PulseIndex control and query plane.
+ * SearchEngineService is the PulseIndex query and indexing API.
  */
 class SearchEngineServiceClient extends \Grpc\BaseStub {
 
@@ -39,8 +39,8 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
 
     /**
      * IndexEntity upserts a single entity into the tenant's index.
-     * Re-indexing the same entity_id within a tenant refreshes its attribute bits
-     * and clears any soft-delete for that id.
+     * Re-indexing the same entity_id within a tenant replaces its attributes and
+     * clears any soft-delete for that id.
      * @param \PulseIndex\Engine\V1\IndexEntityRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
@@ -89,8 +89,8 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
     /**
      * Search applies the boolean filters (MUST / SHOULD / MUST_NOT) plus optional
      * numeric range predicates and returns matching entity IDs only.
-     * When `limit` > 0 the engine may early-exit for microsecond latency and
-     * `total_matches` reflects the scanned page path (exact totals when limit == 0).
+     * When `limit` > 0, `total_matches` may be approximate; it is exact when
+     * `limit` is 0.
      * @param \PulseIndex\Engine\V1\SearchQueryRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
@@ -135,8 +135,8 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
     }
 
     /**
-     * SetCdcOffset records the last applied upstream sequence number so
-     * cold-boot recovery can resume from the correct upstream offset.
+     * SetCdcOffset records the last applied upstream sequence number so a restart
+     * can resume from the correct point. Operator use.
      * @param \PulseIndex\Engine\V1\SetCdcOffsetRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options

@@ -29,7 +29,7 @@ class GetRecoveryStateResponse extends \Google\Protobuf\Internal\Message
      */
     protected $indexed_count = 0;
     /**
-     * Total chunk structures currently allocated across tenants.
+     * Internal sizing metric. Operator use.
      *
      * Generated from protobuf field <code>uint32 chunk_count = 3;</code>
      */
@@ -60,7 +60,7 @@ class GetRecoveryStateResponse extends \Google\Protobuf\Internal\Message
      *     @type int|string $indexed_count
      *           Live indexed entity count across all tenants.
      *     @type int $chunk_count
-     *           Total chunk structures currently allocated across tenants.
+     *           Internal sizing metric. Operator use.
      *     @type int|string $mutations_since_snapshot
      *           Writes since the last successful checkpoint.
      *     @type bool $needs_full_reindex
@@ -128,7 +128,7 @@ class GetRecoveryStateResponse extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Total chunk structures currently allocated across tenants.
+     * Internal sizing metric. Operator use.
      *
      * Generated from protobuf field <code>uint32 chunk_count = 3;</code>
      * @return int
@@ -139,7 +139,7 @@ class GetRecoveryStateResponse extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Total chunk structures currently allocated across tenants.
+     * Internal sizing metric. Operator use.
      *
      * Generated from protobuf field <code>uint32 chunk_count = 3;</code>
      * @param int $var

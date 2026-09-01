@@ -24,8 +24,8 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      */
     protected $location_prefix = 0;
     /**
-     * Ordered attribute predicates (MUST / SHOULD / MUST_NOT).
-     * MUST filters are evaluated most-selective-first internally.
+     * Attribute predicates (MUST / SHOULD / MUST_NOT). Order does not affect the
+     * result.
      *
      * Generated from protobuf field <code>repeated .pulseindex.engine.v1.FilterPredicate filters = 2;</code>
      */
@@ -38,8 +38,7 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
     private $ranges;
     /**
      * Maximum number of entity IDs to return.
-     * 0 means no limit (and forces exact total_matches scanning).
-     * When > 0 the engine may early-exit after filling the page (µs hot path).
+     * 0 means no limit, and makes `total_matches` exact.
      *
      * Generated from protobuf field <code>uint32 limit = 4;</code>
      */
@@ -67,14 +66,13 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      *           Optional location constraint (0 = no location filter).
      *           When non-zero, only entities indexed with that location_prefix match.
      *     @type \Pulseindex\Engine\V1\FilterPredicate[] $filters
-     *           Ordered attribute predicates (MUST / SHOULD / MUST_NOT).
-     *           MUST filters are evaluated most-selective-first internally.
+     *           Attribute predicates (MUST / SHOULD / MUST_NOT). Order does not affect the
+     *           result.
      *     @type \Pulseindex\Engine\V1\RangePredicate[] $ranges
      *           Optional numeric range filters (e.g. price between min_val and max_val).
      *     @type int $limit
      *           Maximum number of entity IDs to return.
-     *           0 means no limit (and forces exact total_matches scanning).
-     *           When > 0 the engine may early-exit after filling the page (µs hot path).
+     *           0 means no limit, and makes `total_matches` exact.
      *     @type int $offset
      *           Number of matches to skip before collecting results (pagination).
      *     @type string $tenant_id
@@ -116,8 +114,8 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Ordered attribute predicates (MUST / SHOULD / MUST_NOT).
-     * MUST filters are evaluated most-selective-first internally.
+     * Attribute predicates (MUST / SHOULD / MUST_NOT). Order does not affect the
+     * result.
      *
      * Generated from protobuf field <code>repeated .pulseindex.engine.v1.FilterPredicate filters = 2;</code>
      * @return RepeatedField<\Pulseindex\Engine\V1\FilterPredicate>
@@ -128,8 +126,8 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Ordered attribute predicates (MUST / SHOULD / MUST_NOT).
-     * MUST filters are evaluated most-selective-first internally.
+     * Attribute predicates (MUST / SHOULD / MUST_NOT). Order does not affect the
+     * result.
      *
      * Generated from protobuf field <code>repeated .pulseindex.engine.v1.FilterPredicate filters = 2;</code>
      * @param \Pulseindex\Engine\V1\FilterPredicate[] $var
@@ -171,8 +169,7 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
 
     /**
      * Maximum number of entity IDs to return.
-     * 0 means no limit (and forces exact total_matches scanning).
-     * When > 0 the engine may early-exit after filling the page (µs hot path).
+     * 0 means no limit, and makes `total_matches` exact.
      *
      * Generated from protobuf field <code>uint32 limit = 4;</code>
      * @return int
@@ -184,8 +181,7 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
 
     /**
      * Maximum number of entity IDs to return.
-     * 0 means no limit (and forces exact total_matches scanning).
-     * When > 0 the engine may early-exit after filling the page (µs hot path).
+     * 0 means no limit, and makes `total_matches` exact.
      *
      * Generated from protobuf field <code>uint32 limit = 4;</code>
      * @param int $var
