@@ -7,31 +7,27 @@
 `AdminHttpClient` and `pulse:reindex --recovery` are removed, with the
 `admin_url`, `admin_port` and `internal_token` configuration behind them.
 
-Neither could ever work from a customer's application: the admin port is not
-published on the internet, and the call needs the internal token shared between
-the service and its control plane. They were shipped tooling for a capability
-that was never the client's.
+Neither could ever work from an application. They were shipped tooling for a
+capability that was never the client's. Remove those three keys from your
+published `config/pulseindex.php` when you upgrade; nothing reads them.
 
 `pulse:reindex` still rebuilds the index from your models. If the service stops
 answering queries, run it — the service resumes once the outbox drains.
 
 ### Breaking: `getRecoveryState()` and `RecoveryState` are gone
 
-Along with the RPCs behind them in the bundled proto. No key the dashboard
-issues could call that RPC — every attempt returned a permission error — so
+No API key could call it — every attempt returned a permission error — so
 nothing that worked stops working.
 
 **Checking readiness:** `health()`, or `servingStatus()` when you need to tell
 "not answering" apart from "not reachable". Both work with any key.
 
-Two commands changed with it:
+Three commands changed with it:
 
 - `pulse:reindex --recovery` gates on the health service instead. Same
   behaviour: it refuses to run while the service is answering normally.
-- `pulse:reconcile` lost its shortcut. It used to compare grand totals before
-  sweeping, which needed an index-wide count only an operator key can read, so
-  every run now walks the models. Slower, same answer. `--full` is accepted and
-  ignored.
+- `pulse:reconcile` lost its shortcut: every run now walks the models. Slower,
+  same answer. `--full` is accepted and ignored.
 - `pulse:health` no longer reports `indexed_count`; the JSON carries `null`.
 
 ### Breaking: `ClientInterface` gained two methods
@@ -63,19 +59,13 @@ public function health(): bool
 
 ### `pulse:health` reported a healthy service as unreachable
 
-Both console commands used an operator-only call that customer API keys are not
-permitted to make, so it came back `PERMISSION_DENIED`.
+`pulse:health` reported `engine_reachable: false` for a service that was
+perfectly healthy, and `pulse:reconcile` aborted before doing any work.
 
-`pulse:health` caught that and reported `engine_reachable: false`. The engine
-was fine; the key was simply not allowed to ask. A single `catch` could not tell
-*denied* from *down*, so it called it down.
-
-`pulse:reconcile` did not catch it at all and aborted before doing any work.
-
-Both now read the standard `grpc.health.v1.Health` protocol, which needs no
-particular scope. `pulse:health` still reports `indexed_count` when the key is
-allowed to read it, but that now happens **after** readiness has been decided,
-so failing to get the number no longer condemns the service.
+Both now read the standard `grpc.health.v1.Health` protocol. `pulse:health`
+still reports `indexed_count` when it can, but that now happens **after**
+readiness has been decided, so failing to get the number no longer condemns the
+service.
 
 ### Added
 

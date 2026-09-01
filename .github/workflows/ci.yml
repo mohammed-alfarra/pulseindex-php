@@ -22,27 +22,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The engine is a separate private repository and is the source of truth
-      # for the proto. Without it, check:proto cannot establish anything about
-      # drift, so this checkout is REQUIRED rather than best-effort: a missing
-      # or expired ENGINE_REPO_TOKEN must break the build instead of silently
-      # downgrading the guard to a green no-op.
+      # The proto drift guard used to run here, checking out the engine with a
+      # token. It never ran once: ENGINE_REPO_TOKEN was never created, so every
+      # run since that step was added died on it in about ten seconds — which
+      # also meant the unit tests below never ran either.
       #
-      # Known limitation, deliberately not worked around here: secrets are not
-      # available to pull_request runs from forks, so this step fails there. If
-      # this repository starts taking fork contributions, that needs a policy
-      # decision (pull_request_target, a separate job, or accepting that the
-      # engine comparison only runs post-merge) — not a silent conditional.
-      - name: Check out engine proto
-        uses: actions/checkout@v4
-        with:
-          repository: mohammed-alfarra/PulseIndex
-          path: pulseindex-engine-src
-          token: ${{ secrets.ENGINE_REPO_TOKEN }}
-
-      - name: Locate engine proto
-        run: echo "PULSEINDEX_PROTO=$GITHUB_WORKSPACE/pulseindex-engine-src/proto/engine.proto" >> "$GITHUB_ENV"
-
+      # It now runs from the engine's own repository (SDK guard workflow),
+      # which reaches this repository without any credential because this one
+      # is public. That removes the reason a token that can read the private
+      # engine would ever sit in a public repository's secrets, and it fixes
+      # the fork limitation this comment used to describe: there is no secret
+      # here for a fork to be denied.
+      #
+      # The trade-off is real and worth naming: drift is no longer checked at
+      # push time here. It is checked on every engine push, nightly, and on
+      # demand — and the release procedure dispatches it before tagging.
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
@@ -50,9 +44,6 @@ jobs:
           tools: composer
 
       - run: composer update --no-interaction --prefer-dist
-
-      - name: Proto drift guard
-        run: composer check:proto:ci
 
       - name: Unit tests
         run: vendor/bin/phpunit --testsuite Unit
