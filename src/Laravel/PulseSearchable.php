@@ -127,6 +127,34 @@ trait PulseSearchable
         return $lon === null || $lon === '' ? null : (float) $lon;
     }
 
+    /**
+     * Which database column, if any, answers each attribute namespace.
+     *
+     * Only consulted when the engine is unreachable and the Eloquent fallback
+     * is switched on. The SDK used to guess this by splitting a tag on its
+     * colon and treating the left side as a column name, so `feature:pool`
+     * became `where('feature', '=', 'pool')` — a column most models do not
+     * have. That either threw a SQL error or matched nothing, and the caller
+     * was told only by a line in the log.
+     *
+     * Declare what your schema can actually answer:
+     *
+     *     public function pulseFallbackMap(): array
+     *     {
+     *         return ['status' => 'status', 'city' => 'city_name'];
+     *     }
+     *
+     * A query touching an attribute that is not listed here will not fall
+     * back. It raises instead, because a search that quietly answers a
+     * different question is worse than one that fails.
+     *
+     * @return array<string, string> attribute namespace => column name
+     */
+    public function pulseFallbackMap(): array
+    {
+        return [];
+    }
+
     public function pulseLatitudeColumn(): string
     {
         return 'latitude';

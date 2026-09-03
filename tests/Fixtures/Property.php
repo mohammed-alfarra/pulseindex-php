@@ -25,6 +25,21 @@ final class Property extends Model
         'longitude' => 'float',
     ];
 
+    /**
+     * Which column answers which attribute namespace when the engine is
+     * unreachable. Without this the fallback has nothing to translate a tag
+     * filter into, and refuses rather than guessing at a column name.
+     *
+     * @return array<string, string>
+     */
+    public function pulseFallbackMap(): array
+    {
+        return [
+            'status' => 'status',
+            'price' => 'price',
+        ];
+    }
+
     public function toPulseSearchableArray(): array
     {
         return [

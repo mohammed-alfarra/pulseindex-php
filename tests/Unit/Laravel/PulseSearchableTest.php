@@ -13,6 +13,7 @@ use PulseIndex\Client;
 use PulseIndex\ClientInterface;
 use PulseIndex\Engine\V1\FilterPredicate\Operation;
 use PulseIndex\Exception\GrpcException;
+use PulseIndex\Exception\PulseIndexFallbackUnavailable;
 use PulseIndex\Geo\GeoHash;
 use PulseIndex\Laravel\PulseIndexServiceProvider;
 use PulseIndex\Laravel\PulseQueryBuilder;
@@ -257,6 +258,32 @@ final class PulseSearchableTest extends TestCase
         $this->expectException(GrpcException::class);
 
         Property::pulseSearch($client)->get();
+    }
+
+    /**
+     * The fallback used to translate `feature:pool` into a `feature` column by
+     * splitting the tag on its colon. Most models have no such column, so the
+     * query either failed in SQL or matched nothing — and the caller was told
+     * only by a line in the log while receiving rows that looked like answers.
+     */
+    public function testFallbackRefusesAnAttributeTheModelCannotAnswer(): void
+    {
+        $this->seedProperties();
+
+        $client = $this->createMock(ClientInterface::class);
+        $client->method('search')->willThrowException(new GrpcException(
+            message: 'unavailable',
+            grpcStatusCode: 14,
+            grpcDetails: 'connection refused',
+        ));
+        $this->app->instance(ClientInterface::class, $client);
+        $this->app->instance(Client::class, $client);
+
+        $this->expectException(PulseIndexFallbackUnavailable::class);
+        // 'feature' is not in Property::pulseFallbackMap().
+        $this->expectExceptionMessageMatches('/feature/');
+
+        Property::pulseSearch($client)->where('feature:pool')->get();
     }
 
     public function testServiceProviderMergesTimeoutAndFallbackConfig(): void

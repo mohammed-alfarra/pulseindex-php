@@ -2,6 +2,30 @@
 
 ## 3.0.0
 
+### Breaking: the Eloquent fallback is off, and no longer guesses
+
+When the engine was unreachable, the fallback rewrote attribute filters into
+database columns by splitting each tag on its colon: `feature:pool` became
+`where('feature', '=', 'pool')`. Most models have no `feature` column, so the
+query either failed in SQL or matched nothing — and the caller was told only by
+a line in the log, while holding rows that looked like an answer.
+
+Two changes. `fallback_enabled` now defaults to **false**: an unreachable
+engine raises rather than quietly answering a near-enough question. And where
+it is switched on, a model says what its schema can answer:
+
+```php
+public function pulseFallbackMap(): array
+{
+    return ['status' => 'status', 'city' => 'city_name'];
+}
+```
+
+A query touching an attribute that is not mapped raises
+`PulseIndexFallbackUnavailable` instead of running. To keep the old behaviour,
+set `PULSEINDEX_FALLBACK_ENABLED=true` and declare the map — there is no
+setting that restores the guessing.
+
 ### Breaking: a query returns a page instead of everything
 
 `QueryBuilder` defaulted to a limit of 0, which the engine read as "no

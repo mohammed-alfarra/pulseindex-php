@@ -59,11 +59,18 @@ return [
     | Eloquent fallback
     |--------------------------------------------------------------------------
     |
-    | When PulseIndex is unreachable, PulseQueryBuilder logs a warning and
-    | hydrates via a native Eloquent query instead of failing the request.
+    | When PulseIndex is unreachable, PulseQueryBuilder can answer from the
+    | database instead of failing the request. Off by default: attribute
+    | filters are tags rather than columns, so the database answers a
+    | near-enough question rather than the same one, and the caller cannot
+    | tell the difference from the rows.
+    |
+    | Switch it on only for models whose pulseFallbackMap() says which column
+    | answers which attribute. A query touching an attribute that is not
+    | mapped raises instead of falling back.
     |
     */
-    'fallback_enabled' => (bool) env('PULSEINDEX_FALLBACK_ENABLED', true),
+    'fallback_enabled' => (bool) env('PULSEINDEX_FALLBACK_ENABLED', false),
 
     /*
     |--------------------------------------------------------------------------

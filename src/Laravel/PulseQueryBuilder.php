@@ -12,6 +12,7 @@ use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Log;
 use PulseIndex\ClientInterface;
 use PulseIndex\Exception\PulseIndexException;
+use PulseIndex\Exception\PulseIndexFallbackUnavailable;
 use PulseIndex\QueryBuilder;
 use PulseIndex\SearchResult;
 
@@ -324,16 +325,20 @@ final class PulseQueryBuilder
         $model = $this->newModel();
         $query = $model->newQuery();
 
+        // Every field here is present in the map: fallbackOrThrow refuses the
+        // query otherwise, so this never guesses at a column name.
+        $map = $this->fallbackMap();
+
         foreach ($this->eloquentWheres as $where) {
-            $query->where($where['field'], $where['operator'], $where['value']);
+            $query->where($map[$where['field']], $where['operator'], $where['value']);
         }
 
         foreach ($this->eloquentWhereIns as $whereIn) {
-            $query->whereIn($whereIn['field'], $whereIn['values']);
+            $query->whereIn($map[$whereIn['field']], $whereIn['values']);
         }
 
         foreach ($this->ranges as $range) {
-            $query->whereBetween($range['field'], [$range['min'], $range['max']]);
+            $query->whereBetween($map[$range['field']], [$range['min'], $range['max']]);
         }
 
         if ($this->geo !== null) {
@@ -374,25 +379,84 @@ final class PulseQueryBuilder
      */
     private function fallbackOrThrow(PulseIndexException $e, callable $fallback): mixed
     {
+        if (!$this->fallbackEnabled()) {
+            throw $e;
+        }
+
+        // Attribute filters are tags. Unless the model has said which column
+        // answers which namespace, there is nothing to translate them into,
+        // and a query built from a guess answers a different question while
+        // looking like an answer to this one.
+        $untranslatable = $this->untranslatableFields();
+        if ($untranslatable !== []) {
+            throw PulseIndexFallbackUnavailable::forFields($untranslatable, $this->modelClass);
+        }
+
+        // Logged here rather than on the way in: this used to say it was
+        // falling back before deciding whether it would.
         Log::warning('PulseIndex connection failed; falling back to Eloquent.', [
             'model' => $this->modelClass,
             'message' => $e->getMessage(),
         ]);
 
-        if (!$this->fallbackEnabled()) {
-            throw $e;
-        }
-
         return $fallback();
     }
 
+    /**
+     * Attribute namespaces in this query that the model cannot answer from a
+     * column.
+     *
+     * @return list<string>
+     */
+    private function untranslatableFields(): array
+    {
+        $map = $this->fallbackMap();
+        $missing = [];
+
+        foreach ($this->eloquentWheres as $where) {
+            if (!array_key_exists($where['field'], $map)) {
+                $missing[] = $where['field'];
+            }
+        }
+        foreach ($this->eloquentWhereIns as $whereIn) {
+            if (!array_key_exists($whereIn['field'], $map)) {
+                $missing[] = $whereIn['field'];
+            }
+        }
+        foreach ($this->ranges as $range) {
+            if (!array_key_exists($range['field'], $map)) {
+                $missing[] = $range['field'];
+            }
+        }
+
+        return array_values(array_unique($missing));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function fallbackMap(): array
+    {
+        $model = $this->newModel();
+
+        return method_exists($model, 'pulseFallbackMap') ? $model->pulseFallbackMap() : [];
+    }
+
+    /**
+     * Off unless asked for.
+     *
+     * On by default, an unreachable engine silently became a different query
+     * against the database — same shape, different answer, and only a log line
+     * to say so. Opting in is how a caller says they would rather have
+     * approximate rows than an error.
+     */
     private function fallbackEnabled(): bool
     {
         if (function_exists('config')) {
-            return (bool) config('pulseindex.fallback_enabled', true);
+            return (bool) config('pulseindex.fallback_enabled', false);
         }
 
-        return true;
+        return false;
     }
 
     private function tokenize(string $field, mixed $value): string
