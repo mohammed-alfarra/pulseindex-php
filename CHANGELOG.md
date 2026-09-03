@@ -1,5 +1,37 @@
 # Changelog
 
+## 3.0.0
+
+### Breaking: a query returns a page instead of everything
+
+`QueryBuilder` defaulted to a limit of 0, which the engine read as "no
+ceiling" and answered with every matching id the tenant held. Nobody writing
+`->get()` meant to ask for that, and the cost of it landed on the service
+rather than on the caller who never mentioned a limit.
+
+The default is now `QueryBuilder::DEFAULT_LIMIT`, a hundred, on both the plain
+builder and the Laravel one. If you relied on getting every match back, say so:
+
+```php
+Property::pulseSearch()->where('city', 'Riyadh')->limit(5000)->get();
+```
+
+A limit above the engine's maximum is refused with the maximum named, rather
+than quietly trimmed — a short page that looks complete is worse than an error.
+
+### Zero now means the count
+
+`limit(0)` no longer means "no ceiling". It asks the engine for the number of
+matches and no ids at all, which is the cheap way to count:
+
+```php
+$total = $client->search($client->query()->tenant('acme')->must('status:active')->limit(0))
+    ->totalMatches;
+```
+
+Requires an engine that speaks this contract. Against an older engine, a limit
+of 0 still returns every id.
+
 ## 2.0.0
 
 ### Breaking: the operator surface is gone
