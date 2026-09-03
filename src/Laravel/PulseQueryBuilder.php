@@ -26,7 +26,15 @@ final class PulseQueryBuilder
 
     private ?int $locationPrefix = null;
 
-    private int $limit = 0;
+    /**
+     * A page unless the caller asks for another size.
+     *
+     * Search results are paginated everywhere else in the world, and the
+     * alternative here was worse than a default: the engine reads a limit of
+     * zero as a request for the total alone, so `get()` would have come back
+     * empty rather than complete.
+     */
+    private int $limit = QueryBuilder::DEFAULT_LIMIT;
 
     private int $offset = 0;
 

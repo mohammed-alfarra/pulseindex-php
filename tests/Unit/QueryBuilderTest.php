@@ -12,6 +12,29 @@ use PulseIndex\QueryBuilder;
 
 final class QueryBuilderTest extends TestCase
 {
+
+    /**
+     * The builder used to default to 0, which the engine read as "no ceiling"
+     * and answered with every matching id the tenant had. Nobody meant to ask
+     * for that, and the cost landed on the service rather than on the caller
+     * who forgot to say.
+     */
+    public function test_a_query_carries_a_page_size_without_being_told(): void
+    {
+        self::assertSame(
+            QueryBuilder::DEFAULT_LIMIT,
+            (new QueryBuilder())->toArray()['limit'],
+        );
+    }
+
+    /**
+     * Zero is still expressible, and now means what it says on the engine:
+     * the total number of matches, and no ids to carry back.
+     */
+    public function test_zero_is_kept_for_callers_who_only_want_the_count(): void
+    {
+        self::assertSame(0, (new QueryBuilder())->limit(0)->toArray()['limit']);
+    }
     public function testFluentFiltersAreImmutableAndOrdered(): void
     {
         $base = new QueryBuilder();

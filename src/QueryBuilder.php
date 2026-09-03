@@ -15,11 +15,21 @@ use PulseIndex\Geo\GeoHash;
  */
 final class QueryBuilder
 {
+    /**
+     * A page, for callers who never say otherwise.
+     *
+     * The default used to be 0, which the engine read as "no ceiling" and
+     * answered with every matching id the tenant had. That is a request nobody
+     * meant to make, and the cost of it landed on the service rather than on
+     * the caller who forgot the limit.
+     */
+    public const DEFAULT_LIMIT = 100;
+
     private string $tenantId = '';
 
     private int $locationPrefix = 0;
 
-    private int $limit = 0;
+    private int $limit = self::DEFAULT_LIMIT;
 
     private int $offset = 0;
 
@@ -112,6 +122,10 @@ final class QueryBuilder
         return $clone;
     }
 
+    /**
+     * How many ids to return. Zero asks the engine for the total number of
+     * matches and no ids at all, which is the cheap way to count.
+     */
     public function limit(int $limit): self
     {
         $clone = clone $this;
