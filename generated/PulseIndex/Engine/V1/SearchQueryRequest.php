@@ -38,7 +38,8 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
     private $ranges;
     /**
      * Maximum number of entity IDs to return.
-     * 0 means no limit, and makes `total_matches` exact.
+     * 0 asks for the exact `total_matches` and no ids at all — the cheap way to
+     * count. It does not mean "no limit".
      *
      * Generated from protobuf field <code>uint32 limit = 4;</code>
      */
@@ -55,6 +56,12 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      * Generated from protobuf field <code>string tenant_id = 6;</code>
      */
     protected $tenant_id = '';
+    /**
+     * Optional ordering. Absent returns matches in entity-id order.
+     *
+     * Generated from protobuf field <code>.pulseindex.engine.v1.SortSpec sort = 7;</code>
+     */
+    protected $sort = null;
 
     /**
      * Constructor.
@@ -72,11 +79,14 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      *           Optional numeric range filters (e.g. price between min_val and max_val).
      *     @type int $limit
      *           Maximum number of entity IDs to return.
-     *           0 means no limit, and makes `total_matches` exact.
+     *           0 asks for the exact `total_matches` and no ids at all — the cheap way to
+     *           count. It does not mean "no limit".
      *     @type int $offset
      *           Number of matches to skip before collecting results (pagination).
      *     @type string $tenant_id
      *           Tenant / namespace to search. Empty → "default".
+     *     @type \PulseIndex\Engine\V1\SortSpec $sort
+     *           Optional ordering. Absent returns matches in entity-id order.
      * }
      */
     public function __construct($data = null)
@@ -169,7 +179,8 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
 
     /**
      * Maximum number of entity IDs to return.
-     * 0 means no limit, and makes `total_matches` exact.
+     * 0 asks for the exact `total_matches` and no ids at all — the cheap way to
+     * count. It does not mean "no limit".
      *
      * Generated from protobuf field <code>uint32 limit = 4;</code>
      * @return int
@@ -181,7 +192,8 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
 
     /**
      * Maximum number of entity IDs to return.
-     * 0 means no limit, and makes `total_matches` exact.
+     * 0 asks for the exact `total_matches` and no ids at all — the cheap way to
+     * count. It does not mean "no limit".
      *
      * Generated from protobuf field <code>uint32 limit = 4;</code>
      * @param int $var
@@ -243,6 +255,41 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
     {
         GPBUtil::checkString($var, true);
         $this->tenant_id = $var;
+
+        return $this;
+    }
+
+    /**
+     * Optional ordering. Absent returns matches in entity-id order.
+     *
+     * Generated from protobuf field <code>.pulseindex.engine.v1.SortSpec sort = 7;</code>
+     * @return \PulseIndex\Engine\V1\SortSpec|null
+     */
+    public function getSort()
+    {
+        return $this->sort;
+    }
+
+    public function hasSort()
+    {
+        return isset($this->sort);
+    }
+
+    public function clearSort()
+    {
+        unset($this->sort);
+    }
+
+    /**
+     * Optional ordering. Absent returns matches in entity-id order.
+     *
+     * Generated from protobuf field <code>.pulseindex.engine.v1.SortSpec sort = 7;</code>
+     * @param \PulseIndex\Engine\V1\SortSpec $var
+     * @return $this
+     */
+    public function setSort(\PulseIndex\Engine\V1\SortSpec|null $var)
+    {
+        $this->sort = $var;
 
         return $this;
     }

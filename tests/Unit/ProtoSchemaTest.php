@@ -50,8 +50,9 @@ final class ProtoSchemaTest extends TestCase
                 'BatchIndexEntitiesResponse' => ['1:uint32 indexed_count'],
                 'DeleteEntityRequest' => ['1:uint64 entity_id', '2:string tenant_id'],
                 'DeleteEntityResponse' => ['1:bool success'],
-                'FilterPredicate' => ['1:Operation op', '2:string attribute'],
+                'FilterPredicate' => ['1:Operation op', '2:string attribute', '3:uint32 group'],
                 'RangePredicate' => ['1:string field', '2:uint32 min_val', '3:uint32 max_val'],
+                'SortSpec' => ['1:string field', '2:bool descending'],
                 'SearchQueryRequest' => [
                     '1:uint64 location_prefix',
                     '2:repeated FilterPredicate filters',
@@ -59,6 +60,7 @@ final class ProtoSchemaTest extends TestCase
                     '4:uint32 limit',
                     '5:uint32 offset',
                     '6:string tenant_id',
+                    '7:SortSpec sort',
                 ],
                 'SearchQueryResponse' => [
                     '1:repeated uint64 matched_entity_ids',

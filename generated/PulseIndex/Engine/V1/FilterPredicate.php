@@ -28,6 +28,16 @@ class FilterPredicate extends \Google\Protobuf\Internal\Message
      * Generated from protobuf field <code>string attribute = 2;</code>
      */
     protected $attribute = '';
+    /**
+     * Which disjunction this SHOULD predicate belongs to. Ignored for MUST and
+     * MUST_NOT.
+     * Members of a group are OR'd together; the groups are AND'd with each other,
+     * so "(red or blue) and (size 42 or 43)" is two groups. Predicates that leave
+     * this unset share group 0, which is the single-group behaviour.
+     *
+     * Generated from protobuf field <code>uint32 group = 3;</code>
+     */
+    protected $group = 0;
 
     /**
      * Constructor.
@@ -39,6 +49,12 @@ class FilterPredicate extends \Google\Protobuf\Internal\Message
      *           How this predicate combines with the current match set.
      *     @type string $attribute
      *           Attribute token identical to those used at index time, e.g. "feature:pool".
+     *     @type int $group
+     *           Which disjunction this SHOULD predicate belongs to. Ignored for MUST and
+     *           MUST_NOT.
+     *           Members of a group are OR'd together; the groups are AND'd with each other,
+     *           so "(red or blue) and (size 42 or 43)" is two groups. Predicates that leave
+     *           this unset share group 0, which is the single-group behaviour.
      * }
      */
     public function __construct($data = null)
@@ -95,6 +111,40 @@ class FilterPredicate extends \Google\Protobuf\Internal\Message
     {
         GPBUtil::checkString($var, true);
         $this->attribute = $var;
+
+        return $this;
+    }
+
+    /**
+     * Which disjunction this SHOULD predicate belongs to. Ignored for MUST and
+     * MUST_NOT.
+     * Members of a group are OR'd together; the groups are AND'd with each other,
+     * so "(red or blue) and (size 42 or 43)" is two groups. Predicates that leave
+     * this unset share group 0, which is the single-group behaviour.
+     *
+     * Generated from protobuf field <code>uint32 group = 3;</code>
+     * @return int
+     */
+    public function getGroup()
+    {
+        return $this->group;
+    }
+
+    /**
+     * Which disjunction this SHOULD predicate belongs to. Ignored for MUST and
+     * MUST_NOT.
+     * Members of a group are OR'd together; the groups are AND'd with each other,
+     * so "(red or blue) and (size 42 or 43)" is two groups. Predicates that leave
+     * this unset share group 0, which is the single-group behaviour.
+     *
+     * Generated from protobuf field <code>uint32 group = 3;</code>
+     * @param int $var
+     * @return $this
+     */
+    public function setGroup(int $var)
+    {
+        GPBUtil::checkUint32($var);
+        $this->group = $var;
 
         return $this;
     }

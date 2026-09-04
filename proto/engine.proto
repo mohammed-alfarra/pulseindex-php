@@ -127,7 +127,8 @@ message FilterPredicate {
   enum Operation {
     // Conjunction: narrows the current match set.
     MUST = 0;
-    // Disjunction group: SHOULD predicates are OR'd, then narrow the match set.
+    // Disjunction: SHOULD predicates sharing a `group` are OR'd together, and
+    // each group then narrows the match set.
     SHOULD = 1;
     // Exclusion: removes matches carrying this attribute.
     MUST_NOT = 2;
@@ -138,6 +139,14 @@ message FilterPredicate {
 
   // Attribute token identical to those used at index time, e.g. "feature:pool".
   string attribute = 2;
+
+  // Which disjunction this SHOULD predicate belongs to. Ignored for MUST and
+  // MUST_NOT.
+  //
+  // Members of a group are OR'd together; the groups are AND'd with each other,
+  // so "(red or blue) and (size 42 or 43)" is two groups. Predicates that leave
+  // this unset share group 0, which is the single-group behaviour.
+  uint32 group = 3;
 }
 
 // RangePredicate filters a continuous numeric field to an inclusive range.
@@ -150,6 +159,23 @@ message RangePredicate {
 
   // Inclusive upper bound of the requested range.
   uint32 max_val = 3;
+}
+
+// SortSpec orders a page by a numeric field.
+//
+// Without it, results come back in entity-id order. Entities carrying no value
+// for the field sort last in both directions; they are still counted in
+// total_matches, they simply have nothing to be ordered by.
+//
+// An ordered search cannot stop early, because the best remaining row may be
+// anywhere in the tenant, so it costs more than the same filter unordered.
+// offset + limit is capped at 100,000.
+message SortSpec {
+  // Numeric field name, the same one a RangePredicate would name.
+  string field = 1;
+
+  // Largest first when true; smallest first otherwise.
+  bool descending = 2;
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +196,8 @@ message SearchQueryRequest {
   repeated RangePredicate ranges = 3;
 
   // Maximum number of entity IDs to return.
-  // 0 means no limit, and makes `total_matches` exact.
+  // 0 asks for the exact `total_matches` and no ids at all — the cheap way to
+  // count. It does not mean "no limit".
   uint32 limit = 4;
 
   // Number of matches to skip before collecting results (pagination).
@@ -178,6 +205,9 @@ message SearchQueryRequest {
 
   // Tenant / namespace to search. Empty → "default".
   string tenant_id = 6;
+
+  // Optional ordering. Absent returns matches in entity-id order.
+  SortSpec sort = 7;
 }
 
 // SearchQueryResponse returns matched ids and timing metadata.

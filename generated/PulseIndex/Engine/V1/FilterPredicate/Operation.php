@@ -21,7 +21,8 @@ class Operation
      */
     const MUST = 0;
     /**
-     * Disjunction group: SHOULD predicates are OR'd, then narrow the match set.
+     * Disjunction: SHOULD predicates sharing a `group` are OR'd together, and
+     * each group then narrows the match set.
      *
      * Generated from protobuf enum <code>SHOULD = 1;</code>
      */
