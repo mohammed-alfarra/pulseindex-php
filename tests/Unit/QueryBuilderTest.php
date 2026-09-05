@@ -53,11 +53,14 @@ final class QueryBuilderTest extends TestCase
         self::assertSame(42, $built->toArray()['location_prefix']);
         self::assertSame(25, $built->toArray()['limit']);
         self::assertSame(10, $built->toArray()['offset']);
+        // Group 0 throughout: a predicate that names no disjunction shares
+        // one, which is what every query did before groups existed.
         self::assertSame([
-            ['op' => Operation::MUST, 'attribute' => 'feature:pool'],
-            ['op' => Operation::SHOULD, 'attribute' => 'amenity:parking'],
-            ['op' => Operation::MUST_NOT, 'attribute' => 'feature:shared'],
+            ['op' => Operation::MUST, 'attribute' => 'feature:pool', 'group' => 0],
+            ['op' => Operation::SHOULD, 'attribute' => 'amenity:parking', 'group' => 0],
+            ['op' => Operation::MUST_NOT, 'attribute' => 'feature:shared', 'group' => 0],
         ], $built->toArray()['filters']);
+        self::assertNull($built->toArray()['sort']);
         self::assertSame([
             ['field' => 'price', 'min' => 100, 'max' => 500],
         ], $built->toArray()['ranges']);
@@ -159,5 +162,109 @@ final class QueryBuilderTest extends TestCase
         self::assertCount(count($covering), $request->getFilters());
         self::assertSame('geo:6:' . $covering[0], $request->getFilters()[0]->getAttribute());
         self::assertSame(Operation::SHOULD, $request->getFilters()[0]->getOp());
+    }
+
+    public function testGroupsKeepDisjunctionsApart(): void
+    {
+        $filters = (new QueryBuilder())
+            ->should('color:red', 1)
+            ->should('color:blue', 1)
+            ->should('size:s', 2)
+            ->should('size:m', 2)
+            ->toArray()['filters'];
+
+        self::assertSame([1, 1, 2, 2], array_column($filters, 'group'));
+    }
+
+    public function testARadiusGetsADisjunctionOfItsOwn(): void
+    {
+        $filters = (new QueryBuilder())
+            ->should('color:red')
+            ->should('color:blue')
+            ->withinRadius(42.6, -5.6, 4.9)
+            ->toArray()['filters'];
+
+        $colours = array_values(array_filter(
+            $filters,
+            static fn (array $f): bool => str_starts_with($f['attribute'], 'color:')
+        ));
+        $cells = array_values(array_filter(
+            $filters,
+            static fn (array $f): bool => str_starts_with($f['attribute'], 'geo:')
+        ));
+
+        self::assertNotSame([], $cells);
+        self::assertSame([0, 0], array_column($colours, 'group'));
+        self::assertSame([1], array_values(array_unique(array_column($cells, 'group'))));
+    }
+
+    public function testTwoRadiiAreAndedNotOred(): void
+    {
+        $filters = (new QueryBuilder())
+            ->withinRadius(42.6, -5.6, 4.9)
+            ->withinRadius(48.85, 2.35, 4.9)
+            ->toArray()['filters'];
+
+        $groups = array_values(array_unique(array_column($filters, 'group')));
+        sort($groups);
+        self::assertSame([1, 2], $groups);
+    }
+
+    public function testARadiusDoesNotTakeAGroupTheCallerNamed(): void
+    {
+        $filters = (new QueryBuilder())
+            ->should('a:1', 3)
+            ->withinRadius(42.6, -5.6, 4.9)
+            ->toArray()['filters'];
+
+        $cells = array_values(array_filter(
+            $filters,
+            static fn (array $f): bool => str_starts_with($f['attribute'], 'geo:')
+        ));
+        self::assertSame([4], array_values(array_unique(array_column($cells, 'group'))));
+    }
+
+    public function testSortIsAbsentUnlessAskedFor(): void
+    {
+        self::assertNull((new QueryBuilder())->must('k:a')->toArray()['sort']);
+
+        self::assertSame(
+            ['field' => 'price', 'descending' => false],
+            (new QueryBuilder())->sortAsc('price')->toArray()['sort']
+        );
+        self::assertSame(
+            ['field' => 'price', 'descending' => true],
+            (new QueryBuilder())->sortDesc('price')->toArray()['sort']
+        );
+    }
+
+    public function testSortReachesTheRequest(): void
+    {
+        $request = (new QueryBuilder())->must('k:a')->sortDesc('price')->toRequest();
+        $sort = $request->getSort();
+
+        self::assertNotNull($sort);
+        self::assertSame('price', $sort->getField());
+        self::assertTrue($sort->getDescending());
+
+        self::assertNull((new QueryBuilder())->must('k:a')->toRequest()->getSort());
+    }
+
+    public function testAnEmptySortFieldIsRefused(): void
+    {
+        $this->expectException(\PulseIndex\Exception\PulseIndexException::class);
+        (new QueryBuilder())->sortAsc('   ');
+    }
+
+    public function testTheBuilderStaysImmutableAcrossGroupsAndSort(): void
+    {
+        $base = (new QueryBuilder())->should('a:1', 1);
+        $withSort = $base->sortAsc('price');
+        $withRadius = $base->withinRadius(42.6, -5.6, 4.9);
+
+        self::assertNull($base->toArray()['sort']);
+        self::assertNotNull($withSort->toArray()['sort']);
+        self::assertCount(1, $base->toArray()['filters']);
+        self::assertGreaterThan(1, count($withRadius->toArray()['filters']));
     }
 }

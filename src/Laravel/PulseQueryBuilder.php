@@ -42,7 +42,16 @@ final class PulseQueryBuilder
     /** @var list<string> */
     private array $must = [];
 
-    /** @var list<string> */
+    /**
+     * One entry per whereIn call, each a disjunction of its own.
+     *
+     * This used to be a flat list of tokens. Every whereIn poured into it, so
+     * two of them merged: whereIn('color', ['red','blue'])->whereIn('size',
+     * ['s','m']) asked for red or blue or small or medium, and returned a
+     * plausible page that answered a different question.
+     *
+     * @var list<list<string>>
+     */
     private array $should = [];
 
     /** @var list<array{field: string, min: int, max: int}> */
@@ -111,15 +120,20 @@ final class PulseQueryBuilder
     }
 
     /**
-     * SHOULD group (OR) for a field, then AND'd into the working set.
+     * One disjunction per call: the values are OR'd with each other, and the
+     * call is AND'd with every other filter, including other whereIn calls.
      *
      * @param list<mixed> $values
      */
     public function whereIn(string $field, array $values): self
     {
         $values = array_values($values);
+        $group = [];
         foreach ($values as $value) {
-            $this->should[] = $this->tokenize($field, $value);
+            $group[] = $this->tokenize($field, $value);
+        }
+        if ($group !== []) {
+            $this->should[] = $group;
         }
 
         $this->eloquentWhereIns[] = [
@@ -184,8 +198,12 @@ final class PulseQueryBuilder
             $query = $query->must($attribute);
         }
 
-        foreach ($this->should as $attribute) {
-            $query = $query->should($attribute);
+        // Group 0 is left for a caller writing should() on the builder
+        // directly, so these start at 1.
+        foreach ($this->should as $index => $group) {
+            foreach ($group as $attribute) {
+                $query = $query->should($attribute, $index + 1);
+            }
         }
 
         foreach ($this->ranges as $range) {

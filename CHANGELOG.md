@@ -1,5 +1,59 @@
 # Changelog
 
+## 3.1.0
+
+### A radius, and each whereIn, no longer merge into one OR
+
+Every SHOULD predicate went into a single disjunction, because until now the
+engine had only one. Two places in this SDK produce SHOULD predicates on their
+own, and both were silently merging with each other and with yours.
+
+`withinRadius` turns a circle into one SHOULD per covering geohash cell, so
+
+```php
+$client->query()->should('color:red')->should('color:blue')->withinRadius($lat, $lon, 5);
+```
+
+asked for "within 5 km **or** red **or** blue". And on the Laravel builder,
+
+```php
+Property::pulseSearch()->whereIn('amenity', ['parking','gym'])->whereIn('city', ['leon','madrid']);
+```
+
+asked for one OR of all four values rather than an amenity **and** a city.
+
+Both now build a disjunction of their own, and each further radius or whereIn
+takes another. A query that used only one of them is unaffected.
+
+### Groups
+
+`should()` takes a group number. Members of a group are OR'd together and the
+groups are AND'd with each other:
+
+```php
+$client->query()
+    ->should('color:red', 1)->should('color:blue', 1)
+    ->should('size:s', 2)->should('size:m', 2);
+```
+
+Left unset it is 0, which is one disjunction — what every existing query does.
+
+### Ordering
+
+`sortAsc($field)`, `sortDesc($field)` and `sortBy($field, $descending)`:
+
+```php
+$client->query()->must('status:active')->sortAsc('price')->execute();
+```
+
+Rows carrying no value for the field sort last in both directions; they still
+count towards the total, they simply have nothing to be ordered by.
+
+An ordered search cannot stop as soon as the page is full — the cheapest
+remaining row may be anywhere in the tenant — so it costs more than the same
+filter unordered. `offset + limit` is capped at 100,000 and a request past it
+is refused with the ceiling named.
+
 ## 3.0.0
 
 ### Breaking: the Eloquent fallback is off, and no longer guesses

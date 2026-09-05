@@ -317,4 +317,46 @@ final class PulseSearchableTest extends TestCase
             ]);
         });
     }
+
+    /**
+     * Every whereIn used to pour into one flat SHOULD list, so two of them
+     * merged: "amenity in (parking, gym) and city in (leon, madrid)" was
+     * answered as one OR of all four, and the page looked plausible.
+     */
+    public function testEachWhereInIsItsOwnDisjunction(): void
+    {
+        $client = $this->createMock(ClientInterface::class);
+        $this->app->instance(ClientInterface::class, $client);
+        $this->app->instance(Client::class, $client);
+
+        $request = Property::pulseSearch($client)
+            ->tenant('acme')
+            ->whereIn('amenity', ['parking', 'gym'])
+            ->whereIn('city', ['leon', 'madrid'])
+            ->whereGeoRadius(42.6, -5.6, 4.9)
+            ->toPulseQuery()
+            ->toRequest();
+
+        $groups = [];
+        foreach ($request->getFilters() as $filter) {
+            if ($filter->getOp() !== Operation::SHOULD) {
+                continue;
+            }
+            $groups[$filter->getAttribute()] = $filter->getGroup();
+        }
+
+        self::assertSame($groups['amenity:parking'], $groups['amenity:gym']);
+        self::assertSame($groups['city:leon'], $groups['city:madrid']);
+        self::assertNotSame($groups['amenity:parking'], $groups['city:leon']);
+
+        $geo = [];
+        foreach ($groups as $attribute => $group) {
+            if (str_starts_with((string) $attribute, 'geo:')) {
+                $geo[] = $group;
+            }
+        }
+        self::assertNotSame([], $geo);
+        self::assertCount(1, array_unique($geo));
+        self::assertNotContains($geo[0], [$groups['amenity:parking'], $groups['city:leon']]);
+    }
 }
