@@ -41,6 +41,13 @@ interface ClientInterface
     public function search(QueryBuilder $query): SearchResult;
 
     /**
+     * A page of ids together with the real number of matches, at the cost of a
+     * second round trip. A paged search early-exits, so its own total is not
+     * the number of matches.
+     */
+    public function searchWithTotal(QueryBuilder $query): SearchResult;
+
+    /**
      * Serving status from `grpc.health.v1.Health`. Needs no particular scope,
      * so it works with any key.
      *

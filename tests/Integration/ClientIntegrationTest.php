@@ -137,19 +137,84 @@ final class ClientIntegrationTest extends TestCase
         self::assertSame(0, $this->client->batchDelete([9_000_001, 9_000_002], $this->tenant));
     }
 
-    public function testGetRecoveryStateReportsHealthyEngine(): void
+    /**
+     * A paged search stops as soon as the page is full, so its total is
+     * whatever it had counted when it stopped. Measured on the production
+     * million: a query with 166,325 matches reported 10,866 for a page of 100.
+     * Anything printing "page 1 of N" from that is wrong by an order of
+     * magnitude and looks entirely fine.
+     */
+    public function testPagedTotalIsMarkedInexactAndSearchWithTotalFixesIt(): void
     {
-        $this->client->index(new Entity(
-            entityId: 42,
-            categories: ['feature:recovery-probe'],
-            tenantId: $this->tenant,
-        ));
+        $entities = [];
+        foreach (range(3001, 3600) as $id) {
+            $entities[] = new Entity(
+                entityId: $id,
+                categories: ['bulk:yes'],
+                price: 100,
+                tenantId: $this->tenant,
+            );
+        }
+        self::assertSame(600, $this->client->batchIndex($entities));
 
-        $state = $this->client->getRecoveryState();
+        $paged = $this->client->search(
+            $this->client->query()->tenant($this->tenant)->must('bulk:yes')->limit(10)
+        );
+        self::assertCount(10, $paged->matchedEntityIds);
+        self::assertFalse($paged->totalIsExact, 'a paged total must not claim to be exact');
+        self::assertNull($paged->exactTotal(), 'an inexact total must not be handed out as a number');
 
-        self::assertGreaterThan(0, $state->indexedCount);
-        self::assertGreaterThanOrEqual(0, $state->lastCdcOffset);
-        // A healthy engine is never in degraded recovery.
-        self::assertFalse($state->needsFullReindex);
+        $counted = $this->client->search(
+            $this->client->query()->tenant($this->tenant)->must('bulk:yes')->limit(0)
+        );
+        self::assertTrue($counted->totalIsExact);
+        self::assertSame(600, $counted->totalMatches);
+
+        $both = $this->client->searchWithTotal(
+            $this->client->query()->tenant($this->tenant)->must('bulk:yes')->limit(10)
+        );
+        self::assertCount(10, $both->matchedEntityIds, 'still one page of ids');
+        self::assertTrue($both->totalIsExact);
+        self::assertSame(600, $both->exactTotal(), 'and the real total beside it');
+    }
+
+    /**
+     * The operator RPCs stay out of the customer client.
+     *
+     * This used to call getRecoveryState() and assert on it. That method was
+     * removed when CreateSnapshot, GetRecoveryState and SetCdcOffset were
+     * trimmed from the vendored proto — no customer key can call them — and the
+     * test has been failing ever since, which is how a suite teaches people to
+     * stop reading it.
+     *
+     * Turned around: it now asserts the trim stays trimmed, so the day someone
+     * regenerates the stubs without the plugin and publishes all three again,
+     * something says so.
+     */
+    public function testTheClientDoesNotExposeOperatorRpcs(): void
+    {
+        foreach (['getRecoveryState', 'createSnapshot', 'setCdcOffset'] as $method) {
+            self::assertFalse(
+                method_exists($this->client, $method),
+                sprintf('%s is an operator RPC and must not be on the customer client', $method),
+            );
+        }
+
+        $stub = new \ReflectionClass(\PulseIndex\Engine\V1\SearchEngineServiceClient::class);
+        $rpcs = array_map(
+            static fn (\ReflectionMethod $m): string => $m->getName(),
+            array_filter(
+                $stub->getMethods(\ReflectionMethod::IS_PUBLIC),
+                static fn (\ReflectionMethod $m): bool => $m->getDeclaringClass()->getName() === $stub->getName()
+                    && $m->getName() !== '__construct',
+            ),
+        );
+        sort($rpcs);
+
+        self::assertSame(
+            ['BatchDeleteEntities', 'BatchIndexEntities', 'DeleteEntity', 'IndexEntity', 'Search'],
+            $rpcs,
+            'the generated stub gained or lost an RPC',
+        );
     }
 }

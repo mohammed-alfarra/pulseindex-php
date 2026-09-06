@@ -2,6 +2,30 @@
 
 ## 3.2.0
 
+### The total on a paged search is not the number of matches
+
+A paged search stops as soon as the page is full — that is what makes it cost
+microseconds — so the total it reports is whatever it had counted when it
+stopped. On a million entities, a query with 166,325 matches reported 10,866
+when asked for a page of 100. Anything printing "page 1 of N" from that number
+is wrong by an order of magnitude and looks entirely fine.
+
+The result now says which it is, and there is a call that gets you the real one:
+
+```php
+$page = $client->search($query->limit(20));
+$page->totalIsExact;   // false — the search early-exited
+$page->exactTotal();   // null, rather than a number you should not divide
+
+$both = $client->searchWithTotal($query->limit(20));
+$both->exactTotal();   // the real total, at the cost of a second round trip
+```
+
+`limit(0)` still asks for the count alone and is exact by itself; nothing about
+that changed, and `searchWithTotal` skips its second call when you already
+passed it.
+
+
 ### `withinRadius` was returning nothing above 8 km
 
 `optimalPrecisionForRadius` chose geohash precision 4 for any radius over 8 km,
