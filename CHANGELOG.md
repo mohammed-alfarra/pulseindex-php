@@ -53,6 +53,25 @@ installed package reads — deriving them from the service provider rather than
 repeating them — and one asserts every `GPBMetadata` class the generated code
 initialises exists.
 
+### The covering threshold, corrected against a real app
+
+`withinRadius` is a pre-filter the caller narrows exactly afterwards, so excess
+area is cheaper than predicates. The first threshold was too strict: it rejected
+the coarse cell at 5 km, turning a 10-cell covering into 167, and a real demo
+app's benchmark went from beating PostgreSQL to losing to it by 2.76x on wall
+time. The cost is the request, not the search.
+
+Measured in that app, 100,000 properties, 5 km radius:
+
+| | before | after |
+|---|---|---|
+| covering | 167 cells | 10 cells |
+| p50 wall | 3,082 us | 926 us |
+| against PostgreSQL | 2.76x slower | 1.35x faster |
+
+The coarse cell is now taken up to 3.0x the circle, which still rejects it at
+2 km where it wastes 4.73x to 6.91x.
+
 ### Migrating
 
 Nothing to change for the common case: index the same way, call `withinRadius`
