@@ -255,4 +255,11 @@ $result = $client->search(
 );
 
 $ids = $result->matchedEntityIds;
+
+// Clearing many rows: send ids in pages of up to 10,000. A larger page is
+// refused by name rather than truncated. The return value is how many rows
+// actually changed, so ids that were already gone are skipped, not fatal.
+foreach (array_chunk($idsToRemove, 10000) as $page) {
+    $deleted = $client->batchDelete($page, 'acme');
+}
 ```

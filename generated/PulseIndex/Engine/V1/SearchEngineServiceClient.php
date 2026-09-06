@@ -44,7 +44,7 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
      * @param \PulseIndex\Engine\V1\IndexEntityRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall
+     * @return \Grpc\UnaryCall<\PulseIndex\Engine\V1\IndexEntityResponse>
      */
     public function IndexEntity(\PulseIndex\Engine\V1\IndexEntityRequest $argument,
       $metadata = [], $options = []) {
@@ -60,7 +60,7 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
      * @param \PulseIndex\Engine\V1\BatchIndexEntitiesRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall
+     * @return \Grpc\UnaryCall<\PulseIndex\Engine\V1\BatchIndexEntitiesResponse>
      */
     public function BatchIndexEntities(\PulseIndex\Engine\V1\BatchIndexEntitiesRequest $argument,
       $metadata = [], $options = []) {
@@ -76,13 +76,29 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
      * @param \PulseIndex\Engine\V1\DeleteEntityRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall
+     * @return \Grpc\UnaryCall<\PulseIndex\Engine\V1\DeleteEntityResponse>
      */
     public function DeleteEntity(\PulseIndex\Engine\V1\DeleteEntityRequest $argument,
       $metadata = [], $options = []) {
         return $this->_simpleRequest('/pulseindex.engine.v1.SearchEngineService/DeleteEntity',
         $argument,
         ['\PulseIndex\Engine\V1\DeleteEntityResponse', 'decode'],
+        $metadata, $options);
+    }
+
+    /**
+     * BatchDeleteEntities soft-deletes many entities in one RPC.
+     * Use this to clear a catalogue: DeleteEntity takes a single id.
+     * @param \PulseIndex\Engine\V1\BatchDeleteEntitiesRequest $argument input argument
+     * @param array $metadata metadata
+     * @param array $options call options
+     * @return \Grpc\UnaryCall<\PulseIndex\Engine\V1\BatchDeleteEntitiesResponse>
+     */
+    public function BatchDeleteEntities(\PulseIndex\Engine\V1\BatchDeleteEntitiesRequest $argument,
+      $metadata = [], $options = []) {
+        return $this->_simpleRequest('/pulseindex.engine.v1.SearchEngineService/BatchDeleteEntities',
+        $argument,
+        ['\PulseIndex\Engine\V1\BatchDeleteEntitiesResponse', 'decode'],
         $metadata, $options);
     }
 
@@ -94,7 +110,7 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
      * @param \PulseIndex\Engine\V1\SearchQueryRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall
+     * @return \Grpc\UnaryCall<\PulseIndex\Engine\V1\SearchQueryResponse>
      */
     public function Search(\PulseIndex\Engine\V1\SearchQueryRequest $argument,
       $metadata = [], $options = []) {
@@ -103,8 +119,5 @@ class SearchEngineServiceClient extends \Grpc\BaseStub {
         ['\PulseIndex\Engine\V1\SearchQueryResponse', 'decode'],
         $metadata, $options);
     }
-
-
-
 
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PulseIndex;
 
 use Grpc\ChannelCredentials;
+use PulseIndex\Engine\V1\BatchDeleteEntitiesRequest;
 use PulseIndex\Engine\V1\BatchIndexEntitiesRequest;
 use PulseIndex\Engine\V1\DeleteEntityRequest;
 use Grpc\Health\V1\HealthCheckRequest;
@@ -251,6 +252,62 @@ final class Client implements ClientInterface
         $response = $this->unary($this->stub->DeleteEntity($request, $this->metadata));
 
         return (bool) $response->getSuccess();
+    }
+
+    /**
+     * Delete many entities in one call.
+     *
+     * `deleteEntity()` takes a single id, so clearing a catalogue that way is
+     * one round trip per row. Send ids in pages of up to 10,000; the engine
+     * refuses a larger page by name rather than truncating it, so a page that
+     * is too big fails loudly instead of deleting part of itself.
+     *
+     * Ids that are unknown or already deleted are skipped, so retrying a page
+     * that half-applied is safe. The return value is the number of rows that
+     * actually changed, which is lower than count($entityIds) whenever some of
+     * them were already gone.
+     *
+     * @param list<int> $entityIds
+     */
+    public function batchDelete(array $entityIds, string $tenantId = ''): int
+    {
+        $request = new BatchDeleteEntitiesRequest();
+        $request->setEntityIds(self::normaliseEntityIds($entityIds));
+        $request->setTenantId($tenantId);
+
+        /** @var \PulseIndex\Engine\V1\BatchDeleteEntitiesResponse $response */
+        $response = $this->unary($this->stub->BatchDeleteEntities($request, $this->metadata));
+
+        return (int) $response->getDeletedCount();
+    }
+
+    /**
+     * Reject an unusable id before anything is sent, and name which one.
+     *
+     * A page of ten thousand ids that fails on one of them has to say which,
+     * or the caller is left bisecting their own input against a server error.
+     *
+     * @param list<int> $entityIds
+     * @return list<int>
+     */
+    private static function normaliseEntityIds(array $entityIds): array
+    {
+        $ids = [];
+        foreach (array_values($entityIds) as $i => $entityId) {
+            if (!is_int($entityId)) {
+                throw new PulseIndexException(
+                    sprintf('batchDelete expects integer entity ids; entityIds[%d] is %s.', $i, get_debug_type($entityId)),
+                );
+            }
+            if ($entityId < 0) {
+                throw new PulseIndexException(
+                    sprintf('batchDelete entity ids must not be negative; entityIds[%d] is %d.', $i, $entityId),
+                );
+            }
+            $ids[] = $entityId;
+        }
+
+        return $ids;
     }
 
     public function search(QueryBuilder $query): SearchResult

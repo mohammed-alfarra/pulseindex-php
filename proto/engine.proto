@@ -39,6 +39,10 @@ service SearchEngineService {
   // The entity id is excluded from subsequent Search results for that tenant.
   rpc DeleteEntity (DeleteEntityRequest) returns (DeleteEntityResponse);
 
+  // BatchDeleteEntities soft-deletes many entities in one RPC.
+  // Use this to clear a catalogue: DeleteEntity takes a single id.
+  rpc BatchDeleteEntities (BatchDeleteEntitiesRequest) returns (BatchDeleteEntitiesResponse);
+
   // Search applies the boolean filters (MUST / SHOULD / MUST_NOT) plus optional
   // numeric range predicates and returns matching entity IDs only.
   // When `limit` > 0, `total_matches` may be approximate; it is exact when
@@ -115,6 +119,28 @@ message DeleteEntityRequest {
 message DeleteEntityResponse {
   // True if the entity was present and marked deleted; false if unknown / already deleted.
   bool success = 1;
+}
+
+// BatchDeleteEntitiesRequest deletes many entities in one tenant.
+message BatchDeleteEntitiesRequest {
+  // Entity ids to delete. Ids that are unknown or already deleted are skipped
+  // rather than refused, so retrying a batch that half-applied is safe.
+  // Repeating an id inside one batch deletes it once.
+  //
+  // A batch above the server's maximum is refused with INVALID_ARGUMENT naming
+  // the ceiling, never silently truncated.
+  repeated uint64 entity_ids = 1;
+
+  // Tenant that owns the entities. Empty → "default". One tenant per batch.
+  string tenant_id = 2;
+}
+
+// BatchDeleteEntitiesResponse reports how many rows actually changed.
+message BatchDeleteEntitiesResponse {
+  // Number of entities that were live and are now deleted. Lower than the
+  // number of ids sent when some were unknown or already deleted; that is not
+  // an error.
+  uint32 deleted_count = 1;
 }
 
 // ---------------------------------------------------------------------------

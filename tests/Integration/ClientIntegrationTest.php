@@ -100,6 +100,43 @@ final class ClientIntegrationTest extends TestCase
         self::assertContains(1003, $afterDelete->matchedEntityIds);
     }
 
+    public function testBatchDeleteClearsTheTenantAndReportsRowsChanged(): void
+    {
+        $ids = range(2001, 2050);
+        $entities = [];
+        foreach ($ids as $id) {
+            $entities[] = new Entity(
+                entityId: $id,
+                categories: ['feature:clearme'],
+                price: 100,
+                tenantId: $this->tenant,
+            );
+        }
+
+        self::assertSame(50, $this->client->batchIndex($entities));
+
+        self::assertSame(
+            50,
+            $this->client->batchDelete($ids, $this->tenant),
+            'every row that was live is reported',
+        );
+
+        $after = $this->client->search(
+            $this->client->query()
+                ->tenant($this->tenant)
+                ->must('feature:clearme')
+                ->limit(50)
+        );
+        self::assertSame([], $after->matchedEntityIds);
+
+        // A retry of a page that already applied is not an error, and reports
+        // the smaller number rather than failing on ids that are already gone.
+        self::assertSame(0, $this->client->batchDelete($ids, $this->tenant));
+
+        // Ids that were never indexed are skipped the same way.
+        self::assertSame(0, $this->client->batchDelete([9_000_001, 9_000_002], $this->tenant));
+    }
+
     public function testGetRecoveryStateReportsHealthyEngine(): void
     {
         $this->client->index(new Entity(

@@ -28,6 +28,16 @@ interface ClientInterface
 
     public function deleteEntity(int $entityId, string $tenantId = ''): bool;
 
+    /**
+     * Delete many entities in one call, up to 10,000 ids per page.
+     *
+     * Returns the number of rows that actually changed, which is lower than
+     * count($entityIds) when some were unknown or already deleted.
+     *
+     * @param list<int> $entityIds
+     */
+    public function batchDelete(array $entityIds, string $tenantId = ''): int;
+
     public function search(QueryBuilder $query): SearchResult;
 
     /**

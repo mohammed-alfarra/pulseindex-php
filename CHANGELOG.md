@@ -1,5 +1,31 @@
 # Changelog
 
+## 3.2.0
+
+### Delete many entities in one call
+
+`deleteEntity()` takes a single id, so clearing a catalogue meant one round trip
+per row. There was no other way to do it through the API at all.
+
+```php
+foreach (array_chunk($idsToRemove, 10000) as $page) {
+    $deleted = $client->batchDelete($page, 'acme');
+}
+```
+
+Up to 10,000 ids per call. A larger page is refused by name rather than
+truncated, so a page that is too big fails loudly instead of deleting part of
+itself and reporting success.
+
+Ids that are unknown or already deleted are skipped rather than refused, so
+retrying a page that half-applied is safe. The return value is the number of
+rows that actually changed, which is lower than `count($page)` whenever some
+were already gone.
+
+An id that is not a non-negative integer names its own position in the message
+and nothing is sent, so a bad value in a page of ten thousand does not leave you
+bisecting your own input against a server error.
+
 ## 3.1.0
 
 ### A radius, and each whereIn, no longer merge into one OR
