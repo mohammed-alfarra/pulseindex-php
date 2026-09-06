@@ -182,6 +182,28 @@ final class ProtoSchema
      *
      * @return list<string>
      */
+    /**
+     * The RPCs the published copy leaves out on purpose, and the messages that
+     * go with them. No customer key can call these, so shipping them would
+     * advertise a door nobody can open.
+     *
+     * Named here rather than tolerated silently. This check used to accept ANY
+     * omission, so it could not tell one of these from an RPC somebody forgot
+     * to vendor: removing BatchDeleteEntities from the vendored copy left the
+     * guard green. Adding an operator RPC to the engine now has to be a
+     * deliberate line here.
+     *
+     * @var list<string>
+     */
+    public const DELIBERATELY_OMITTED_RPCS = ['CreateSnapshot', 'GetRecoveryState', 'SetCdcOffset'];
+
+    /** @var list<string> */
+    public const DELIBERATELY_OMITTED_MESSAGES = [
+        'CreateSnapshotRequest', 'CreateSnapshotResponse',
+        'GetRecoveryStateRequest', 'GetRecoveryStateResponse',
+        'SetCdcOffsetRequest', 'SetCdcOffsetResponse',
+    ];
+
     public static function subsetDiff(self $engine, self $vendored): array
     {
         $out = [];
@@ -190,6 +212,28 @@ final class ProtoSchema
             if (!in_array($rpc, $engine->rpcs, true)) {
                 $out[] = "+ rpc not in the engine: {$rpc}";
             }
+        }
+
+        // The other direction, which is the one that was missing.
+        foreach ($engine->rpcs as $rpc) {
+            if (in_array($rpc, $vendored->rpcs, true)) {
+                continue;
+            }
+            $name = trim(explode('(', $rpc)[0]);
+            if (in_array($name, self::DELIBERATELY_OMITTED_RPCS, true)) {
+                continue;
+            }
+            $out[] = "- rpc missing from the vendored copy: {$rpc}";
+        }
+
+        foreach (array_keys($engine->messages) as $name) {
+            if (isset($vendored->messages[$name])) {
+                continue;
+            }
+            if (in_array($name, self::DELIBERATELY_OMITTED_MESSAGES, true)) {
+                continue;
+            }
+            $out[] = "- message missing from the vendored copy: {$name}";
         }
 
         foreach ($vendored->messages as $name => $mine) {

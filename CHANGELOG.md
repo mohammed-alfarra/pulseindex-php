@@ -89,15 +89,28 @@ bisecting your own input against a server error.
 
 `OutboxWorker` batched its upserts and then deleted one row at a time, because
 there was nothing else to call. A drain claiming a thousand deletes made a
-thousand round trips.
-
-That was merely slow while the engine did not count deletes against the per-key
-ceiling. The engine counts them now, so the same drain would have spent the
-whole ceiling and left rows backing off and eventually parking. It is one call
-per tenant, split at the engine's batch maximum.
+thousand round trips. It is now one call per tenant, split at the engine's batch
+maximum: 3,000 deletes went from three passes and a twenty-second stall to
+0.018 s.
 
 Nothing to change on your side — `outbox:work` and `pulseindex:reindex` behave
 the same and finish sooner.
+
+**Correcting what an earlier note here claimed.** This change was first
+described as fixing rows that would "spend the whole per-key ceiling in one
+drain" and "park as failed after twelve attempts". Both were measured
+afterwards and both were wrong:
+
+- A single drain of 1,000 deletes is **not** refused. Against a real engine the
+  first refusal came at request 1,372.
+- Rows **do not** park. A refused delete backs off 20 seconds, and the token
+  bucket refills completely in that time, so the retry succeeds. Driving the
+  pre-change worker through a 3,000-row backlog ended with **zero** rows at
+  `failed_at`.
+
+What is true is that continuous draining of a backlog over ~1,372 rows did get
+refusals (344 then 663 across passes) and finished about twenty seconds later
+than it needed to. Slower and noisier in `last_error`, not broken.
 
 ## 3.1.0
 

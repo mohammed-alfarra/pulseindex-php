@@ -85,6 +85,67 @@ final class ProtoSchemaTest extends TestCase
         return ProtoSchema::parse((string) file_get_contents($path));
     }
 
+    /**
+     * The guard has to tell a deliberate trim from a forgotten one.
+     *
+     * subsetDiff only ever walked the vendored declarations, so anything the
+     * engine had and the copy lacked passed silently. Verified before this:
+     * deleting BatchDeleteEntities from the vendored proto left the check
+     * green — a customer-facing RPC missing from a published SDK, which is the
+     * exact drift this guard exists to catch.
+     */
+    public function test_an_rpc_missing_from_the_vendored_copy_is_reported(): void
+    {
+        $engine = ProtoSchema::parse(<<<'PROTO'
+            service SearchEngineService {
+              rpc Search (SearchQueryRequest) returns (SearchQueryResponse);
+              rpc BatchDeleteEntities (BatchDeleteEntitiesRequest) returns (BatchDeleteEntitiesResponse);
+            }
+            message SearchQueryRequest { uint32 limit = 1; }
+            message SearchQueryResponse { uint32 total_matches = 1; }
+            message BatchDeleteEntitiesRequest { repeated uint64 entity_ids = 1; }
+            message BatchDeleteEntitiesResponse { uint32 deleted_count = 1; }
+            PROTO);
+
+        $vendored = ProtoSchema::parse(<<<'PROTO'
+            service SearchEngineService {
+              rpc Search (SearchQueryRequest) returns (SearchQueryResponse);
+            }
+            message SearchQueryRequest { uint32 limit = 1; }
+            message SearchQueryResponse { uint32 total_matches = 1; }
+            PROTO);
+
+        $diff = ProtoSchema::subsetDiff($engine, $vendored);
+
+        self::assertNotEmpty($diff, 'a forgotten RPC must not pass');
+        self::assertStringContainsString('BatchDeleteEntities', implode("\n", $diff));
+    }
+
+    /** The operator RPCs are the omissions that are allowed, and only those. */
+    public function test_the_operator_rpcs_may_be_omitted_without_complaint(): void
+    {
+        $engine = ProtoSchema::parse(<<<'PROTO'
+            service SearchEngineService {
+              rpc Search (SearchQueryRequest) returns (SearchQueryResponse);
+              rpc GetRecoveryState (GetRecoveryStateRequest) returns (GetRecoveryStateResponse);
+            }
+            message SearchQueryRequest { uint32 limit = 1; }
+            message SearchQueryResponse { uint32 total_matches = 1; }
+            message GetRecoveryStateRequest { }
+            message GetRecoveryStateResponse { uint64 indexed_count = 2; }
+            PROTO);
+
+        $vendored = ProtoSchema::parse(<<<'PROTO'
+            service SearchEngineService {
+              rpc Search (SearchQueryRequest) returns (SearchQueryResponse);
+            }
+            message SearchQueryRequest { uint32 limit = 1; }
+            message SearchQueryResponse { uint32 total_matches = 1; }
+            PROTO);
+
+        self::assertSame([], ProtoSchema::subsetDiff($engine, $vendored));
+    }
+
     public function test_declares_exactly_the_expected_rpcs(): void
     {
         self::assertSame(self::expected()['rpcs'], self::actual()->rpcs);
