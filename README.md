@@ -254,6 +254,11 @@ $result = $client->search(
         ->limit(50)
 );
 
+> **`withinRadius` is a fast pre-filter, not an exact radius.** It expands the
+> circle into geohash cells, which are rectangles, so results include some points
+> outside the radius — about 1.1x to 1.8x the circle's area. The engine stores no
+> coordinates, so filter the remainder from your own data after hydration.
+
 $ids = $result->matchedEntityIds;
 
 // Clearing many rows: send ids in pages of up to 10,000. A larger page is

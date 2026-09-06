@@ -58,28 +58,170 @@ final class GeoHashTest extends TestCase
         self::assertSame('ezefr', GeoHash::neighbor('ezs42', 'w'));
     }
 
-    public function testOptimalPrecisionForRadius(): void
+    /**
+     * Only ever a precision entities actually carry.
+     *
+     * This used to return 4 above 8 km, and nothing is indexed at 4, so every
+     * radius over 8 km matched nothing whatsoever. Against a real engine with
+     * entities tagged by encodeMultiTags, 15 km returned 0 of 386 and 50 km
+     * returned 0 of 4,282 — an empty page, with no error to explain it.
+     */
+    public function testOptimalPrecisionIsAlwaysOneTheIndexCarries(): void
     {
-        self::assertSame(6, GeoHash::optimalPrecisionForRadius(0.0));
-        self::assertSame(6, GeoHash::optimalPrecisionForRadius(1.0));
-        self::assertSame(6, GeoHash::optimalPrecisionForRadius(1.5));
-        self::assertSame(5, GeoHash::optimalPrecisionForRadius(1.51));
-        self::assertSame(5, GeoHash::optimalPrecisionForRadius(4.9));
-        self::assertSame(5, GeoHash::optimalPrecisionForRadius(8.0));
-        self::assertSame(4, GeoHash::optimalPrecisionForRadius(8.01));
-        self::assertSame(4, GeoHash::optimalPrecisionForRadius(40.0));
-        self::assertSame(GeoHash::optimalPrecisionForRadius(4.9), GeoHash::precisionForRadius(4.9));
+        foreach ([0.0, 0.5, 1.0, 1.5, 2.0, 5.0, 8.0, 8.01, 10.0, 15.0, 25.0, 40.0, 50.0] as $radius) {
+            self::assertContains(
+                GeoHash::optimalPrecisionForRadius($radius, 24.7136, 46.6753),
+                GeoHash::INDEX_PRECISIONS,
+                sprintf('a %s km radius chose a precision nothing is indexed at', $radius),
+            );
+        }
+    }
+
+    public function testFinerPrecisionIsPreferredWhileItFitsTheBudget(): void
+    {
+        $lat = 24.7136;
+        $lon = 46.6753;
+
+        // Small circles fit inside the fine precision's budget.
+        self::assertSame(6, GeoHash::optimalPrecisionForRadius(0.5, $lat, $lon));
+        self::assertSame(6, GeoHash::optimalPrecisionForRadius(5.0, $lat, $lon));
+        // Large ones do not, and fall back to the coarser indexed precision.
+        self::assertSame(5, GeoHash::optimalPrecisionForRadius(15.0, $lat, $lon));
+        self::assertSame(5, GeoHash::optimalPrecisionForRadius(50.0, $lat, $lon));
+
+        self::assertSame(
+            GeoHash::optimalPrecisionForRadius(4.9, $lat, $lon),
+            GeoHash::precisionForRadius(4.9, $lat, $lon),
+        );
+    }
+
+    /**
+     * A radius too large to cover is refused, not half-covered. The old cap
+     * stopped the walk at 64 cells and returned them: a 50 km search came back
+     * with cells covering 18% of its own circle and said nothing about it.
+     */
+    public function testARadiusTooLargeToCoverIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/needs more than \\d+ geohash cells/');
+
+        GeoHash::optimalPrecisionForRadius(400.0, 24.7136, 46.6753);
+    }
+
+    /**
+     * The covering has to actually contain the circle. Sixteen bearings around
+     * the rim, every one inside a returned cell — this is what a truncated
+     * covering fails.
+     */
+    public function testTheCoveringContainsTheWholeCircle(): void
+    {
+        foreach ([[24.7136, 46.6753], [51.5074, -0.1278], [-33.8688, 151.2093]] as [$lat, $lon]) {
+            foreach ([0.5, 2.0, 5.0, 15.0, 40.0] as $radius) {
+                $cells = GeoHash::getCoveringHashes($lat, $lon, $radius);
+                $bounds = array_map(static fn (string $h): array => GeoHash::decodeBounds($h), $cells);
+
+                for ($bearing = 0; $bearing < 360; $bearing += 22.5) {
+                    [$plat, $plon] = self::destination($lat, $lon, $radius * 0.999, $bearing);
+                    $inside = false;
+                    foreach ($bounds as $b) {
+                        if ($plat >= $b['latMin'] && $plat <= $b['latMax']
+                            && $plon >= $b['lonMin'] && $plon <= $b['lonMax']) {
+                            $inside = true;
+                            break;
+                        }
+                    }
+                    self::assertTrue($inside, sprintf(
+                        'a point on the %s km rim at bearing %s from (%s, %s) fell outside every returned cell',
+                        $radius, $bearing, $lat, $lon,
+                    ));
+                }
+            }
+        }
+    }
+
+    /**
+     * The over-inclusion a covering costs, bounded. Cells are rectangles and
+     * the query is a circle, so some excess is unavoidable — 6x is not.
+     * Measured before this change: 2 km returned 5.43x the true count against a
+     * real engine, and 5 km returned 3.03x.
+     */
+    public function testCoveredAreaStaysCloseToTheCircle(): void
+    {
+        $lat = 24.7136;
+        $lon = 46.6753;
+
+        foreach ([0.5, 2.0, 5.0, 10.0, 15.0, 25.0, 50.0] as $radius) {
+            $covered = 0.0;
+            foreach (GeoHash::getCoveringHashes($lat, $lon, $radius) as $hash) {
+                $b = GeoHash::decodeBounds($hash);
+                $covered += (6371.0 * deg2rad($b['latMax'] - $b['latMin']))
+                    * (6371.0 * cos(deg2rad(($b['latMax'] + $b['latMin']) / 2)) * deg2rad($b['lonMax'] - $b['lonMin']));
+            }
+            $ratio = $covered / (M_PI * $radius ** 2);
+            self::assertLessThan(2.0, $ratio, sprintf(
+                'a %s km radius covers %.2fx the area it asked for', $radius, $ratio,
+            ));
+        }
+    }
+
+    public function testAPrecisionNothingIsIndexedAtIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/is not indexed/');
+
+        GeoHash::getCoveringHashes(24.7136, 46.6753, 15.0, 4);
+    }
+
+    /**
+     * The same vectors the JS SDK asserts against.
+     *
+     * Two implementations of one contract, and nothing checked they agreed. A
+     * customer moving between the SDKs would have got different result sets for
+     * the same call and had no way to tell which was right.
+     */
+    public function testCoveringMatchesTheSharedVectors(): void
+    {
+        $vectors = json_decode(
+            (string) file_get_contents(__DIR__ . '/../Fixtures/geo-covering-vectors.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+        self::assertNotEmpty($vectors);
+
+        foreach ($vectors as $v) {
+            $cells = GeoHash::getCoveringHashes($v['lat'], $v['lon'], $v['radiusKm']);
+            $label = sprintf('%s at %s km', $v['name'], $v['radiusKm']);
+
+            self::assertCount($v['count'], $cells, $label);
+            self::assertSame($v['precision'], strlen($cells[0]), $label);
+            self::assertSame($v['first'], $cells[0], $label);
+            self::assertSame($v['last'], $cells[count($cells) - 1], $label);
+        }
+    }
+
+    /** Great-circle destination, for placing points exactly on the rim. */
+    private static function destination(float $lat, float $lon, float $km, float $bearing): array
+    {
+        $R = 6371.0;
+        $d = $km / $R;
+        $b = deg2rad($bearing);
+        $la = deg2rad($lat);
+        $lo = deg2rad($lon);
+        $la2 = asin(sin($la) * cos($d) + cos($la) * sin($d) * cos($b));
+        $lo2 = $lo + atan2(sin($b) * sin($d) * cos($la), cos($d) - sin($la) * sin($la2));
+
+        return [rad2deg($la2), rad2deg($lo2)];
     }
 
     public function testGetCoveringHashesUsesOptimalPrecisionAndKeepsCentre(): void
     {
         $hashes = GeoHash::getCoveringHashes(42.6, -5.6, 4.9);
 
-        self::assertSame('ezs42', $hashes[0]);
+        self::assertSame('ezs42e', $hashes[0]);
         self::assertGreaterThanOrEqual(1, count($hashes));
         self::assertSame($hashes, array_values(array_unique($hashes)));
         foreach ($hashes as $hash) {
-            self::assertSame(5, strlen($hash));
+            self::assertSame(6, strlen($hash));
         }
     }
 

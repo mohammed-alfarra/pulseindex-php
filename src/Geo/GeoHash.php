@@ -31,7 +31,21 @@ final class GeoHash
 
     private const EARTH_RADIUS_KM = 6371.0;
 
-    private const MAX_COVERING_CELLS = 64;
+    /**
+     * Most cells one radius query may expand into, and therefore the most
+     * SHOULD predicates it sends.
+     *
+     * This used to be 64 and it was a truncation limit: the walk stopped mid
+     * covering and returned what it had, so a 50 km search covered 18% of its
+     * own circle and said nothing. It is now a budget the precision is chosen
+     * to fit, so a covering is always complete or the request is refused.
+     *
+     * 512 against the engine's 4,096-filter ceiling, and `benches/text_shapes`
+     * measured 539 OR terms at 10.75 us, so the cost is in the request size
+     * rather than the search. It supports radii up to about 60 km at the
+     * coarsest indexed precision; past that the request is refused by name.
+     */
+    public const COVERING_CELL_BUDGET = 512;
 
     /**
      * Neighbor charset keyed by direction then even/odd hash length (0 = even).
@@ -212,59 +226,129 @@ final class GeoHash
     }
 
     /**
-     * Precision that tightly covers $radiusKm without oversized cells.
+     * The precision a radius query should cover at, at this point on the globe.
      *
-     * - ≤ 1.5 km → 6 (~1.2×0.6 km)
-     * - ≤ 8.0 km → 5 (~4.9×4.9 km)
-     * - > 8.0 km → 4 (~39×19 km)
+     * Only ever one of {@see INDEX_PRECISIONS}. That is the correction: this
+     * used to return 4 for anything over 8 km, and nothing is indexed at
+     * precision 4, so **every radius above 8 km matched nothing at all**.
+     * Measured against a real engine with entities tagged by
+     * {@see encodeMultiTags}: 15 km returned 0 of 386, 50 km returned 0 of
+     * 4,282. Not an over-count — an empty page, silently.
+     *
+     * Of the indexed precisions it returns the finest whose complete covering
+     * fits {@see COVERING_CELL_BUDGET}, because a finer cell wastes less area
+     * outside the circle. Measured over-inclusion at Riyadh:
+     *
+     * | radius | prec 6            | prec 5           | chosen |
+     * |--------|-------------------|------------------|--------|
+     * | 0.5 km | 2 cells, 1.73x    | 1 cell, 27.6x    | 6      |
+     * | 2 km   | 32 cells, 1.73x   | 4 cells, 6.91x   | 6      |
+     * | 5 km   | 140 cells, 1.21x  | 10 cells, 2.76x  | 6      |
+     * | 10 km  | 523 cells, 1.13x  | 26 cells, 1.80x  | 5      |
+     * | 15 km  | 1120 cells        | 47 cells, 1.44x  | 5      |
+     * | 50 km  | —                 | 406 cells, 1.12x | 5      |
+     *
+     * Latitude is a parameter because it changes the answer: a cell keeps its
+     * width in degrees, so it narrows in kilometres toward the poles and the
+     * same radius needs more of them. Choosing without a latitude would
+     * underestimate everywhere but the equator.
+     *
+     * @throws InvalidArgumentException when no indexed precision can cover the
+     *         radius within the budget — refused rather than half-covered.
      */
-    public static function optimalPrecisionForRadius(float $radiusKm): int
+    public static function optimalPrecisionForRadius(float $radiusKm, float $lat = 0.0, float $lon = 0.0): int
     {
         if ($radiusKm < 0.0) {
             throw new InvalidArgumentException('Radius must be non-negative.');
         }
 
-        if ($radiusKm <= 1.5) {
-            return 6;
+        $precisions = self::INDEX_PRECISIONS;
+        rsort($precisions);          // finest first
+
+        $budget = self::COVERING_CELL_BUDGET;
+        foreach ($precisions as $precision) {
+            // One past the budget is enough to know it does not fit, and stops
+            // a 100 km radius from walking sixteen hundred cells to find out.
+            if (count(self::walkCovering($lat, $lon, $radiusKm, $precision, $budget + 1)) <= $budget) {
+                return $precision;
+            }
         }
 
-        if ($radiusKm <= 8.0) {
-            return 5;
-        }
-
-        return 4;
+        throw new InvalidArgumentException(sprintf(
+            'A %s km radius needs more than %d geohash cells at every indexed precision (%s). '
+            . 'Use a smaller radius, or index a coarser precision.',
+            rtrim(rtrim(number_format($radiusKm, 2, '.', ''), '0'), '.'),
+            $budget,
+            implode(', ', self::INDEX_PRECISIONS),
+        ));
     }
 
     /**
      * @see optimalPrecisionForRadius()
      */
-    public static function precisionForRadius(float $radiusKm): int
+    public static function precisionForRadius(float $radiusKm, float $lat = 0.0, float $lon = 0.0): int
     {
-        return self::optimalPrecisionForRadius($radiusKm);
+        return self::optimalPrecisionForRadius($radiusKm, $lat, $lon);
     }
 
     /**
-     * GeoHashes at $precision whose cells intersect the search circle.
+     * GeoHashes whose cells cover the search circle.
      *
-     * Walks the centre cell and its neighbors (expanding only through intersecting
-     * cells) so the covering tightly bounds the radius instead of always emitting
-     * a 3×3 neighborhood.
+     * The covering is always complete. It used to stop at 64 cells and return
+     * what it had, so a caller asking for 50 km got cells covering 18% of that
+     * circle, and one asking for 1 km at a fine precision got 30% — with no
+     * error either time. Now the precision is chosen to fit the budget
+     * ({@see optimalPrecisionForRadius}) and the walk always finishes, so the
+     * result either covers the circle or the call refuses.
+     *
+     * Passing $precision explicitly overrides the choice, and is checked
+     * against {@see INDEX_PRECISIONS}: entities carry tags only at those, so
+     * any other precision matches nothing at all rather than matching loosely.
      *
      * @return list<string>
+     *
+     * @throws InvalidArgumentException on a negative radius, a precision
+     *         nothing is indexed at, or a radius too large to cover.
      */
     public static function getCoveringHashes(float $lat, float $lon, float $radiusKm, ?int $precision = null): array
     {
         if ($radiusKm < 0.0) {
             throw new InvalidArgumentException('Radius must be non-negative.');
         }
+        self::assertLatitude($lat);
+        self::assertLongitude($lon);
 
-        $precision ??= self::optimalPrecisionForRadius($radiusKm);
-        self::assertPrecision($precision);
+        if ($precision === null) {
+            $precision = self::optimalPrecisionForRadius($radiusKm, $lat, $lon);
+        } else {
+            self::assertPrecision($precision);
+            if (!in_array($precision, self::INDEX_PRECISIONS, true)) {
+                throw new InvalidArgumentException(sprintf(
+                    'Precision %d is not indexed, so a covering at it matches nothing. Indexed precisions: %s.',
+                    $precision,
+                    implode(', ', self::INDEX_PRECISIONS),
+                ));
+            }
+        }
 
-        $center = self::encode($lat, $lon, $precision);
+        return self::walkCovering($lat, $lon, $radiusKm, $precision, null);
+    }
+
+    /**
+     * Every cell at $precision that intersects the circle, breadth-first from
+     * the centre and expanding only through cells that intersect.
+     *
+     * $limit exists only so the precision chooser can stop early once a
+     * precision is known not to fit; a null limit walks the covering to
+     * completion, which is what every caller that wants an answer passes.
+     *
+     * @return list<string>
+     */
+    private static function walkCovering(float $lat, float $lon, float $radiusKm, int $precision, ?int $limit): array
+    {
         $covering = [];
         $visited = [];
-        $queue = [$center];
+        $queue = [self::encode($lat, $lon, $precision)];
 
         while ($queue !== []) {
             $hash = array_shift($queue);
@@ -278,8 +362,8 @@ final class GeoHash
             }
 
             $covering[] = $hash;
-            if (count($covering) >= self::MAX_COVERING_CELLS) {
-                break;
+            if ($limit !== null && count($covering) >= $limit) {
+                return $covering;
             }
 
             foreach (self::neighbors($hash) as $neighbor) {

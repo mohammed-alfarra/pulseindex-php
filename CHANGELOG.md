@@ -2,6 +2,41 @@
 
 ## 3.2.0
 
+### `withinRadius` was returning nothing above 8 km
+
+`optimalPrecisionForRadius` chose geohash precision 4 for any radius over 8 km,
+and entities are only ever tagged at precisions 5 and 6. A covering at
+precision 4 therefore matched **nothing at all**. Measured against a real
+engine with 20,000 points around Riyadh:
+
+| radius | true matches | returned, before | returned, after |
+|--------|-------------:|-----------------:|----------------:|
+| 2 km   | 7            | 38               | 9               |
+| 5 km   | 36           | 109              | 42              |
+| 15 km  | 386          | **0**            | 518             |
+| 50 km  | 4,282        | **0**            | 4,800           |
+
+The precision is now always one the index carries, and of those the finest
+whose complete covering fits a cell budget. Small radii also tightened: 2 km
+went from 5.4x the true count to 1.3x.
+
+### A covering is no longer truncated in silence
+
+The 64-cell limit stopped the search mid-covering and returned what it had, so
+a 50 km circle came back covered 18% and a 1 km circle at fine precision came
+back covered 30% — with no error either time. The limit is now a budget the
+precision is chosen to fit, so the covering always completes. A radius too
+large for any indexed precision is refused by name.
+
+### `withinRadius` is a pre-filter, not an exact radius
+
+Cells are rectangles and the query is a circle, so the result still contains
+some points outside it — now about 1.1x to 1.8x the circle's area rather than
+up to 6x. The engine stores no coordinates, so only you can filter the
+remainder, from your own data after hydration. This was always true and was
+never written down.
+
+
 ### Delete many entities in one call
 
 `deleteEntity()` takes a single id, so clearing a catalogue meant one round trip

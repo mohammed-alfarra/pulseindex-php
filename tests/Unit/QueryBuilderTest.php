@@ -137,7 +137,9 @@ final class QueryBuilderTest extends TestCase
 
         self::assertSame([], $base->toArray()['filters']);
         self::assertCount(count($covering), $request->getFilters());
-        self::assertSame(5, GeoHash::optimalPrecisionForRadius($radiusKm));
+        // 6, not 5: a 4.9 km circle fits inside the fine precision's cell
+        // budget, and a finer cell wastes less area outside the circle.
+        self::assertSame(6, GeoHash::optimalPrecisionForRadius($radiusKm, $lat, $lon));
 
         $attributes = [];
         foreach ($request->getFilters() as $filter) {
@@ -146,9 +148,9 @@ final class QueryBuilderTest extends TestCase
         }
 
         self::assertSame(array_map(GeoHash::tag(...), $covering), $attributes);
-        self::assertSame('geo:5:ezs42', $attributes[0]);
+        self::assertSame('geo:6:ezs42e', $attributes[0]);
         foreach ($attributes as $attribute) {
-            self::assertMatchesRegularExpression('/^geo:5:[0-9bcdefghjkmnpqrstuvwxyz]+$/', $attribute);
+            self::assertMatchesRegularExpression('/^geo:6:[0-9bcdefghjkmnpqrstuvwxyz]+$/', $attribute);
         }
     }
 

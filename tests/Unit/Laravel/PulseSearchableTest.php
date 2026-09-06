@@ -204,7 +204,12 @@ final class PulseSearchableTest extends TestCase
         self::assertContains('status:open', $must);
         self::assertContains('amenity:parking', $should);
         self::assertContains('amenity:gym', $should);
-        self::assertContains(GeoHash::tag('ezs42'), $should);
+        // The covering is at whatever precision the radius resolves to, so the
+        // assertion asks the same source the builder does rather than pinning
+        // a hash that only held while the precision table was wrong.
+        foreach (GeoHash::getCoveringHashes(42.6, -5.6, 4.9) as $cell) {
+            self::assertContains(GeoHash::tag($cell), $should);
+        }
         self::assertCount(1, $request->getRanges());
         self::assertSame('price', $request->getRanges()[0]->getField());
         self::assertSame(100, $request->getRanges()[0]->getMinVal());
