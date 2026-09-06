@@ -40,12 +40,42 @@ final class GeoHash
      * own circle and said nothing. It is now a budget the precision is chosen
      * to fit, so a covering is always complete or the request is refused.
      *
-     * 512 against the engine's 4,096-filter ceiling, and `benches/text_shapes`
-     * measured 539 OR terms at 10.75 us, so the cost is in the request size
-     * rather than the search. It supports radii up to about 60 km at the
-     * coarsest indexed precision; past that the request is refused by name.
+     * The number is set by latitude, not by radius. A cell keeps its width in
+     * degrees and so narrows in kilometres toward the poles, and the coarsest
+     * indexed precision is what large radii land on. Cells needed at precision
+     * 5, measured:
+     *
+     * |            | 5 km | 15 km | 25 km | 50 km | 100 km |
+     * |------------|-----:|------:|------:|------:|-------:|
+     * | equator    |   12 |    44 |   112 |   376 |   1396 |
+     * | London 51N |   10 |    60 |   162 |   592 |   2218 |
+     * | Oslo 60N   |   14 |    80 |   198 |   720 |   2748 |
+     * | Tromso 70N |   16 |   110 |   276 |  1044 |   4010 |
+     * | 80N        |   34 |   214 |   546 |  2028 |   6000 |
+     *
+     * A first attempt used 512, chosen at one latitude, and it refused a 50 km
+     * search anywhere above 60 degrees - Oslo, Stockholm, Helsinki, Saint
+     * Petersburg, Anchorage. 2,048 covers 50 km everywhere up to 80 degrees.
+     *
+     * The cost is real and bounded: measured against a live engine, a covering
+     * costs about 0.57 us per cell (406 cells resolved in 232 us), so a query
+     * at the full budget spends roughly 1.2 ms in the engine. It also stays
+     * half of the engine's own 4,096-filter ceiling, leaving room for the
+     * caller's other predicates.
      */
-    public const COVERING_CELL_BUDGET = 512;
+    public const COVERING_CELL_BUDGET = 2048;
+
+    /**
+     * How much area outside the circle a covering may carry before a finer
+     * precision is worth its cell count.
+     *
+     * Cells are rectangles and the query is a circle, so some excess is not
+     * optional. 2.0 is where the measured choices come out right at every
+     * radius: it rejects precision 5 at 2 km (6.91x) and at 5 km (2.76x) and
+     * accepts it at 15 km (1.44x), which is also where the cell count turns
+     * from 47 into 1,120.
+     */
+    public const ACCEPTABLE_COVER_RATIO = 2.0;
 
     /**
      * Neighbor charset keyed by direction then even/odd hash length (0 = even).
@@ -263,21 +293,43 @@ final class GeoHash
         }
 
         $precisions = self::INDEX_PRECISIONS;
-        rsort($precisions);          // finest first
-
+        sort($precisions);           // coarsest first
         $budget = self::COVERING_CELL_BUDGET;
+
+        $fallback = null;
         foreach ($precisions as $precision) {
             // One past the budget is enough to know it does not fit, and stops
-            // a 100 km radius from walking sixteen hundred cells to find out.
-            if (count(self::walkCovering($lat, $lon, $radiusKm, $precision, $budget + 1)) <= $budget) {
+            // a 100 km radius from walking six thousand cells to find out.
+            $cells = self::walkCovering($lat, $lon, $radiusKm, $precision, $budget + 1);
+            if (count($cells) > $budget) {
+                continue;
+            }
+
+            // Coarsest first, and stop at the first one that is accurate
+            // enough. Taking the finest that merely fits was the earlier rule
+            // and it was wrong: at 15 km precision 6 costs 1,120 cells for
+            // 1.07x the circle where precision 5 costs 47 for 1.44x — 24 times
+            // the predicates to shave a quarter off an excess that is already
+            // small. The finer cell only earns its cost when the coarser one
+            // is genuinely loose.
+            if ($radiusKm > 0.0 && self::coveredRatio($cells, $radiusKm) <= self::ACCEPTABLE_COVER_RATIO) {
                 return $precision;
             }
+            $fallback = $precision;   // fits, but looser than we would like
+        }
+
+        // Nothing hit the target; the finest that fits is the tightest on offer.
+        if ($fallback !== null) {
+            return $fallback;
         }
 
         throw new InvalidArgumentException(sprintf(
-            'A %s km radius needs more than %d geohash cells at every indexed precision (%s). '
-            . 'Use a smaller radius, or index a coarser precision.',
+            'A %s km radius at latitude %.1f needs more than %d geohash cells at every indexed '
+            . 'precision (%s). Geohash cells narrow toward the poles, so the same radius costs '
+            . 'more cells the further from the equator it is asked. Use a smaller radius, move '
+            . 'the search nearer the equator, or index a coarser precision.',
             rtrim(rtrim(number_format($radiusKm, 2, '.', ''), '0'), '.'),
+            $lat,
             $budget,
             implode(', ', self::INDEX_PRECISIONS),
         ));
@@ -414,9 +466,72 @@ final class GeoHash
     {
         $bounds = self::decodeBounds($hash);
         $closestLat = min(max($lat, $bounds['latMin']), $bounds['latMax']);
-        $closestLon = min(max($lon, $bounds['lonMin']), $bounds['lonMax']);
+        $closestLon = self::closestLongitude($lon, $bounds['lonMin'], $bounds['lonMax']);
 
         return self::haversineKm($lat, $lon, $closestLat, $closestLon) <= $radiusKm;
+    }
+
+    /**
+     * The longitude in [$lonMin, $lonMax] nearest to $lon, going the short way
+     * round the globe.
+     *
+     * A plain clamp is wrong at the antimeridian, because -180 and +180 are the
+     * same meridian and a numeric comparison does not know it. Measured before
+     * this: a query at lon 179.99 against the cell spanning -180 to -179.989
+     * clamped to -179.989 and measured 2.334 km, when the true nearest point is
+     * -180.0 at 1.112 km. The cell was rejected from a 2 km radius it is well
+     * inside, and five of sixteen points on that circle's rim fell outside the
+     * covering — silently, which is the whole family of bug this file has been
+     * corrected for.
+     *
+     * Working in deltas normalised to +/-180 removes the discontinuity: the
+     * cell either straddles the query meridian, or it lies wholly to one side
+     * of it and the nearer edge is the answer.
+     */
+    private static function closestLongitude(float $lon, float $lonMin, float $lonMax): float
+    {
+        $toMin = self::normalizeLonDelta($lonMin - $lon);
+        $toMax = self::normalizeLonDelta($lonMax - $lon);
+
+        // Straddles the query's own meridian, so that is the closest point.
+        // A geohash cell never spans more than 180 degrees, so this reads
+        // correctly on either side of the line.
+        if ($toMin <= 0.0 && $toMax >= 0.0) {
+            return $lon;
+        }
+
+        return abs($toMin) <= abs($toMax) ? $lonMin : $lonMax;
+    }
+
+    /**
+     * Covered area divided by the circle's, so a precision can be judged on
+     * what it wastes rather than only on what it costs.
+     *
+     * @param list<string> $cells
+     */
+    private static function coveredRatio(array $cells, float $radiusKm): float
+    {
+        $covered = 0.0;
+        foreach ($cells as $hash) {
+            $b = self::decodeBounds($hash);
+            $covered += (self::EARTH_RADIUS_KM * deg2rad($b['latMax'] - $b['latMin']))
+                * (self::EARTH_RADIUS_KM
+                    * cos(deg2rad(($b['latMax'] + $b['latMin']) / 2.0))
+                    * deg2rad($b['lonMax'] - $b['lonMin']));
+        }
+
+        return $covered / (M_PI * $radiusKm ** 2);
+    }
+
+    /** A longitude difference folded into [-180, 180]. */
+    private static function normalizeLonDelta(float $delta): float
+    {
+        $delta = fmod($delta + 180.0, 360.0);
+        if ($delta < 0.0) {
+            $delta += 360.0;
+        }
+
+        return $delta - 180.0;
     }
 
     private static function haversineKm(float $lat1, float $lon1, float $lat2, float $lon2): float

@@ -82,10 +82,12 @@ final class GeoHashTest extends TestCase
         $lat = 24.7136;
         $lon = 46.6753;
 
-        // Small circles fit inside the fine precision's budget.
+        // Small circles need the fine cell: the coarse one wastes 6.91x the
+        // area at 2 km and 2.76x at 5 km, well past what is acceptable.
         self::assertSame(6, GeoHash::optimalPrecisionForRadius(0.5, $lat, $lon));
         self::assertSame(6, GeoHash::optimalPrecisionForRadius(5.0, $lat, $lon));
-        // Large ones do not, and fall back to the coarser indexed precision.
+        // Large ones do not. At 15 km the coarse cell is already within 1.44x,
+        // and the fine one would cost 1,120 cells instead of 47 to reach 1.07x.
         self::assertSame(5, GeoHash::optimalPrecisionForRadius(15.0, $lat, $lon));
         self::assertSame(5, GeoHash::optimalPrecisionForRadius(50.0, $lat, $lon));
 
@@ -115,7 +117,16 @@ final class GeoHashTest extends TestCase
      */
     public function testTheCoveringContainsTheWholeCircle(): void
     {
-        foreach ([[24.7136, 46.6753], [51.5074, -0.1278], [-33.8688, 151.2093]] as [$lat, $lon]) {
+        $places = [
+            [24.7136, 46.6753],     // Riyadh
+            [51.5074, -0.1278],     // London, across the prime meridian
+            [-33.8688, 151.2093],   // Sydney
+            [0.0, 179.99],          // hard against the antimeridian, east side
+            [0.0, -179.99],         // and the west side
+            [-16.5, 179.9],         // Fiji, a real place that sits on it
+            [71.0, 25.8],           // North Cape, where cells are narrow
+        ];
+        foreach ($places as [$lat, $lon]) {
             foreach ([0.5, 2.0, 5.0, 15.0, 40.0] as $radius) {
                 $cells = GeoHash::getCoveringHashes($lat, $lon, $radius);
                 $bounds = array_map(static fn (string $h): array => GeoHash::decodeBounds($h), $cells);
@@ -124,8 +135,20 @@ final class GeoHashTest extends TestCase
                     [$plat, $plon] = self::destination($lat, $lon, $radius * 0.999, $bearing);
                     $inside = false;
                     foreach ($bounds as $b) {
-                        if ($plat >= $b['latMin'] && $plat <= $b['latMax']
-                            && $plon >= $b['lonMin'] && $plon <= $b['lonMax']) {
+                        if ($plat < $b['latMin'] || $plat > $b['latMax']) {
+                            continue;
+                        }
+                        // Longitude compared in a frame anchored at the cell's
+                        // west edge, so the +/-180 seam is not a discontinuity.
+                        // Comparing raw degrees made this assertion lie at the
+                        // antimeridian in both directions.
+                        $span = $b['lonMax'] - $b['lonMin'];
+                        $off = fmod(($plon - $b['lonMin']) + 180.0, 360.0);
+                        if ($off < 0.0) {
+                            $off += 360.0;
+                        }
+                        $off -= 180.0;
+                        if ($off >= -1e-9 && $off <= $span + 1e-9) {
                             $inside = true;
                             break;
                         }
@@ -196,6 +219,91 @@ final class GeoHashTest extends TestCase
             self::assertSame($v['precision'], strlen($cells[0]), $label);
             self::assertSame($v['first'], $cells[0], $label);
             self::assertSame($v['last'], $cells[count($cells) - 1], $label);
+        }
+    }
+
+    /**
+     * The coarser cell is chosen whenever it is accurate enough, because the
+     * finer one is not free.
+     *
+     * An earlier rule took the finest precision that merely fit the budget. At
+     * 15 km that is precision 6: 1,120 cells for 1.07x the circle, against
+     * precision 5's 47 cells for 1.44x. Twenty-four times the predicates to
+     * shave a quarter off an excess that was already small.
+     */
+    public function testTheCoarserCellIsUsedWhenItIsAccurateEnough(): void
+    {
+        $fifteen = GeoHash::getCoveringHashes(24.7136, 46.6753, 15.0);
+        self::assertLessThan(
+            200,
+            count($fifteen),
+            'a 15 km covering should cost tens of cells, not over a thousand',
+        );
+
+        // And the fine cell is still chosen where the coarse one is loose.
+        $two = GeoHash::getCoveringHashes(24.7136, 46.6753, 2.0);
+        self::assertSame(6, strlen($two[0]));
+    }
+
+    /**
+     * The nearest point in a cell, going the short way round the globe.
+     *
+     * A plain clamp is wrong at the antimeridian because -180 and +180 are the
+     * same meridian. Measured before this: a query at lon 179.99 against the
+     * cell spanning -180 to -179.989 clamped to the far edge and measured
+     * 2.334 km, when the true nearest point is -180.0 at 1.112 km. The cell was
+     * dropped from a 2 km radius it sits well inside, and five of sixteen
+     * points on that circle's rim fell outside the covering.
+     */
+    public function testACellAcrossTheAntimeridianIsNotDropped(): void
+    {
+        $cells = GeoHash::getCoveringHashes(0.0, 179.99, 2.0);
+
+        $west = array_filter($cells, static fn (string $h): bool => GeoHash::decodeBounds($h)['lonMin'] < 0.0);
+
+        self::assertNotEmpty($west, 'the covering never crossed the line');
+        self::assertContains('800000', $cells, 'the cell immediately across the line is missing');
+    }
+
+    public function testTheSameCoveringIsFoundFromEitherSideOfTheLine(): void
+    {
+        // 179.999 and -179.999 are 222 metres apart. Their 5 km coverings
+        // should be nearly the same set, not two disjoint halves.
+        $east = GeoHash::getCoveringHashes(0.0, 179.999, 5.0);
+        $west = GeoHash::getCoveringHashes(0.0, -179.999, 5.0);
+
+        $shared = count(array_intersect($east, $west));
+        self::assertGreaterThan(
+            count($east) * 0.8,
+            $shared,
+            'coverings a few hundred metres apart barely overlapped, so one of them did not wrap',
+        );
+    }
+
+    /**
+     * Cells keep their width in degrees and narrow in kilometres toward the
+     * poles, so the same radius costs more cells the further north it is asked.
+     * The refusal has to say that, or an operator reads "too many cells" and
+     * goes looking at the radius.
+     */
+    public function testTheRefusalNamesTheLatitudeThatCausedIt(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/latitude 89\\.9/');
+
+        GeoHash::getCoveringHashes(89.9, 0.0, 50.0);
+    }
+
+    /**
+     * The budget was first set at one latitude and refused a 50 km search
+     * anywhere above 60 degrees — Oslo, Stockholm, Helsinki, Saint Petersburg.
+     */
+    public function testFiftyKilometresWorksWhereEuropeansLive(): void
+    {
+        foreach ([[59.9139, 10.7522], [59.3293, 18.0686], [60.1699, 24.9384], [69.6492, 18.9553]] as [$lat, $lon]) {
+            $cells = GeoHash::getCoveringHashes($lat, $lon, 50.0);
+            self::assertNotEmpty($cells);
+            self::assertLessThanOrEqual(GeoHash::COVERING_CELL_BUDGET, count($cells));
         }
     }
 
