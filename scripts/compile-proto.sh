@@ -56,6 +56,36 @@ command -v protoc >/dev/null 2>&1 || {
   exit 1
 }
 
+# Refuse rather than write a client that contradicts the proto beside it.
+#
+# There used to be a fallback here: with no plugin installed, the script wrote a
+# hand-maintained client by heredoc. That client still declared CreateSnapshot,
+# GetRecoveryState and SetCdcOffset — the operator RPCs this vendored proto
+# deliberately omits — so running the script on a machine without the plugin
+# quietly published all three and undid the trim the file above spends a comment
+# explaining. It also drifted: any RPC added to the proto was simply missing from
+# the client until somebody noticed by hand.
+#
+# A generator that half-works is worse than one that stops, because its output
+# looks generated.
+#
+# Checked before the wipe below, not after. Sitting after it, a missing plugin
+# deleted the committed client and only then refused, so the failure left the
+# repository worse than it found it.
+if ! command -v grpc_php_plugin >/dev/null 2>&1; then
+  cat >&2 <<'MSG'
+error: grpc_php_plugin is required and was not found on PATH.
+
+  macOS:  brew install grpc
+  Linux:  build it from grpc/grpc, or use a distro package that ships it
+
+There is no fallback on purpose. The one that used to be here wrote a client
+declaring the operator RPCs that proto/engine.proto leaves out, so generating
+without the plugin published them to every customer.
+MSG
+  exit 1
+fi
+
 rm -rf "${OUT_DIR}/PulseIndex" "${OUT_DIR}/GPBMetadata"
 mkdir -p "${OUT_DIR}"
 
@@ -65,160 +95,12 @@ protoc \
   -I "${PROTO_DIR}" \
   "${PROTO_FILE}"
 
-CLIENT_OUT="${OUT_DIR}/PulseIndex/Engine/V1/SearchEngineServiceClient.php"
-mkdir -p "$(dirname "${CLIENT_OUT}")"
-
-if command -v grpc_php_plugin >/dev/null 2>&1; then
-  echo "Generating gRPC client via grpc_php_plugin..."
-  protoc \
-    --plugin=protoc-gen-grpc="$(command -v grpc_php_plugin)" \
-    --grpc_out="${OUT_DIR}" \
-    -I "${PROTO_DIR}" \
-    "${PROTO_FILE}"
-else
-  echo "grpc_php_plugin not found; writing SearchEngineServiceClient stub..."
-  cat > "${CLIENT_OUT}" <<'PHP'
-<?php
-/**
- * gRPC client stub for SearchEngineService.
- * Written by scripts/compile-proto.sh when grpc_php_plugin is unavailable.
- */
-
-namespace PulseIndex\Engine\V1;
-
-class SearchEngineServiceClient extends \Grpc\BaseStub
-{
-    /**
-     * @param string $hostname
-     * @param array<string, mixed> $opts
-     * @param mixed $channel
-     */
-    public function __construct($hostname, $opts, $channel = null)
-    {
-        parent::__construct($hostname, $opts, $channel);
-    }
-
-    /**
-     * @param IndexEntityRequest $argument
-     * @param array<string, array<int, string>> $metadata
-     * @param array<string, mixed> $options
-     * @return mixed
-     */
-    public function IndexEntity(IndexEntityRequest $argument, $metadata = [], $options = [])
-    {
-        return $this->_simpleRequest(
-            '/pulseindex.engine.v1.SearchEngineService/IndexEntity',
-            $argument,
-            [IndexEntityResponse::class, 'decode'],
-            $metadata,
-            $options
-        );
-    }
-
-    /**
-     * @param BatchIndexEntitiesRequest $argument
-     * @param array<string, array<int, string>> $metadata
-     * @param array<string, mixed> $options
-     * @return mixed
-     */
-    public function BatchIndexEntities(BatchIndexEntitiesRequest $argument, $metadata = [], $options = [])
-    {
-        return $this->_simpleRequest(
-            '/pulseindex.engine.v1.SearchEngineService/BatchIndexEntities',
-            $argument,
-            [BatchIndexEntitiesResponse::class, 'decode'],
-            $metadata,
-            $options
-        );
-    }
-
-    /**
-     * @param DeleteEntityRequest $argument
-     * @param array<string, array<int, string>> $metadata
-     * @param array<string, mixed> $options
-     * @return mixed
-     */
-    public function DeleteEntity(DeleteEntityRequest $argument, $metadata = [], $options = [])
-    {
-        return $this->_simpleRequest(
-            '/pulseindex.engine.v1.SearchEngineService/DeleteEntity',
-            $argument,
-            [DeleteEntityResponse::class, 'decode'],
-            $metadata,
-            $options
-        );
-    }
-
-    /**
-     * @param SearchQueryRequest $argument
-     * @param array<string, array<int, string>> $metadata
-     * @param array<string, mixed> $options
-     * @return mixed
-     */
-    public function Search(SearchQueryRequest $argument, $metadata = [], $options = [])
-    {
-        return $this->_simpleRequest(
-            '/pulseindex.engine.v1.SearchEngineService/Search',
-            $argument,
-            [SearchQueryResponse::class, 'decode'],
-            $metadata,
-            $options
-        );
-    }
-
-    /**
-     * @param CreateSnapshotRequest $argument
-     * @param array<string, array<int, string>> $metadata
-     * @param array<string, mixed> $options
-     * @return mixed
-     */
-    public function CreateSnapshot(CreateSnapshotRequest $argument, $metadata = [], $options = [])
-    {
-        return $this->_simpleRequest(
-            '/pulseindex.engine.v1.SearchEngineService/CreateSnapshot',
-            $argument,
-            [CreateSnapshotResponse::class, 'decode'],
-            $metadata,
-            $options
-        );
-    }
-
-    /**
-     * @param GetRecoveryStateRequest $argument
-     * @param array<string, array<int, string>> $metadata
-     * @param array<string, mixed> $options
-     * @return mixed
-     */
-    public function GetRecoveryState(GetRecoveryStateRequest $argument, $metadata = [], $options = [])
-    {
-        return $this->_simpleRequest(
-            '/pulseindex.engine.v1.SearchEngineService/GetRecoveryState',
-            $argument,
-            [GetRecoveryStateResponse::class, 'decode'],
-            $metadata,
-            $options
-        );
-    }
-
-    /**
-     * @param SetCdcOffsetRequest $argument
-     * @param array<string, array<int, string>> $metadata
-     * @param array<string, mixed> $options
-     * @return mixed
-     */
-    public function SetCdcOffset(SetCdcOffsetRequest $argument, $metadata = [], $options = [])
-    {
-        return $this->_simpleRequest(
-            '/pulseindex.engine.v1.SearchEngineService/SetCdcOffset',
-            $argument,
-            [SetCdcOffsetResponse::class, 'decode'],
-            $metadata,
-            $options
-        );
-    }
-}
-PHP
-fi
+echo "Generating gRPC client via grpc_php_plugin..."
+protoc \
+  --plugin=protoc-gen-grpc="$(command -v grpc_php_plugin)" \
+  --grpc_out="${OUT_DIR}" \
+  -I "${PROTO_DIR}" \
+  "${PROTO_FILE}"
 
 # Record a normalised hash so scripts/check-proto.sh can detect hand-edits to the
 # vendored proto that were not produced by this script.
