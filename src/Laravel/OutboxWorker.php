@@ -19,6 +19,12 @@ use Throwable;
  */
 final class OutboxWorker
 {
+    /**
+     * The engine's own ceiling on one batch. It refuses a larger one by name
+     * rather than truncating it, so a claim bigger than this is split here.
+     */
+    private const MAX_BATCH = 10000;
+
     public function __construct(private readonly ClientInterface $client)
     {
     }
@@ -58,12 +64,26 @@ final class OutboxWorker
             }
         }
 
-        foreach ($deletes as $d) {
-            try {
-                $this->client->deleteEntity($d['entity_id'], $d['tenant_id']);
-                $this->finalizeOk($db, $table, $d['id'], $revisionOf[$d['id']]) ? $result['deleted']++ : $result['requeued']++;
-            } catch (Throwable $e) {
-                $result['failed'] += $this->finalizeErr($db, $table, $d['id'], $e->getMessage(), $maxAttempts);
+        // One call per tenant, mirroring the upserts above. This drained a
+        // claim of a thousand deletes as a thousand round trips, which was
+        // merely slow while the engine did not count them — and became a way
+        // to spend the whole per-key ceiling in one drain the moment it did.
+        // Chunked at the engine's batch maximum, which refuses rather than
+        // truncates, so a claim larger than that must not be sent whole.
+        foreach ($deletes as $tenantId => $items) {
+            foreach (array_chunk($items, self::MAX_BATCH) as $chunk) {
+                $entityIds = array_map(static fn (array $d): int => $d['entity_id'], $chunk);
+                $ids = array_map(static fn (array $d): int => $d['id'], $chunk);
+                try {
+                    $this->client->batchDelete($entityIds, (string) $tenantId);
+                    foreach ($ids as $id) {
+                        $this->finalizeOk($db, $table, $id, $revisionOf[$id]) ? $result['deleted']++ : $result['requeued']++;
+                    }
+                } catch (Throwable $e) {
+                    foreach ($ids as $id) {
+                        $result['failed'] += $this->finalizeErr($db, $table, $id, $e->getMessage(), $maxAttempts);
+                    }
+                }
             }
         }
 
@@ -122,9 +142,8 @@ final class OutboxWorker
                 $entity = $model->toPulseEntity();
                 $upserts[$entity->tenantId][] = ['entity' => $entity, 'id' => (int) $r->id];
             } else {
-                $deletes[] = [
+                $deletes[(string) $r->tenant_id][] = [
                     'entity_id' => (int) $r->entity_id,
-                    'tenant_id' => (string) $r->tenant_id,
                     'id' => (int) $r->id,
                 ];
             }

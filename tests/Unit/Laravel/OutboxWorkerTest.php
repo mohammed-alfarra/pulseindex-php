@@ -104,16 +104,92 @@ final class OutboxWorkerTest extends TestCase
         PulseSync::withoutSyncing(fn () => $p->delete());   // row gone, marker still there
 
         $deleted = null;
-        $this->client->method('deleteEntity')->willReturnCallback(function (int $id, string $tenant) use (&$deleted): bool {
-            $deleted = [$id, $tenant];
+        $this->client->method('batchDelete')->willReturnCallback(function (array $ids, string $tenant) use (&$deleted): int {
+            $deleted = [$ids, $tenant];
 
-            return true;
+            return count($ids);
         });
 
         $r = $this->worker()->drain(null, 100, 12);
 
         self::assertSame(1, $r['deleted']);
-        self::assertSame([$p->id, 'acme'], $deleted);
+        self::assertSame([[$p->id], 'acme'], $deleted);
+        self::assertSame(0, DB::table('pulseindex_outbox')->count());
+    }
+
+    /**
+     * A claim of a thousand deletes used to be a thousand round trips. That was
+     * merely slow while the engine did not count deletes against the per-key
+     * ceiling, and became a way to spend the entire ceiling in one drain the
+     * moment it did — after which the rows back off and eventually park.
+     */
+    public function test_a_claim_of_many_deletes_is_one_call_per_tenant(): void
+    {
+        $ids = [];
+        foreach (range(1, 250) as $i) {
+            $p = $this->makeProperty($i);
+            Outbox::mark($p, 'upsert');
+            PulseSync::withoutSyncing(fn () => $p->delete());
+            $ids[] = $p->id;
+        }
+
+        $calls = [];
+        $this->client->expects(self::never())->method('deleteEntity');
+        $this->client->method('batchDelete')->willReturnCallback(function (array $entityIds, string $tenant) use (&$calls): int {
+            $calls[] = [$tenant, count($entityIds)];
+
+            return count($entityIds);
+        });
+
+        $r = $this->worker()->drain(null, 1000, 12);
+
+        self::assertSame(250, $r['deleted']);
+        self::assertSame([['acme', 250]], $calls, 'one call carrying every id, not one call per id');
+        self::assertSame(0, DB::table('pulseindex_outbox')->count());
+    }
+
+    /**
+     * The engine refuses a batch over its maximum by name rather than
+     * truncating it, so a claim larger than that has to be split here — or the
+     * whole drain fails on a page nobody sized.
+     *
+     * The rows are inserted straight into the outbox rather than built from
+     * models: a marker whose model no longer exists is what becomes a delete,
+     * which is the same path and does not need ten thousand model rows.
+     */
+    public function test_a_claim_larger_than_the_engine_maximum_is_split(): void
+    {
+        $now = Carbon::now();
+        $rows = [];
+        foreach (range(1, 10001) as $i) {
+            $rows[] = [
+                'model_type' => Property::class,
+                'model_key' => (string) $i,
+                'entity_id' => $i,
+                'tenant_id' => 'acme',
+                'operation' => 'delete',
+                'revision' => 0,
+                'attempts' => 0,
+                'available_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+        foreach (array_chunk($rows, 500) as $chunk) {
+            DB::table('pulseindex_outbox')->insert($chunk);
+        }
+
+        $sizes = [];
+        $this->client->method('batchDelete')->willReturnCallback(function (array $entityIds) use (&$sizes): int {
+            $sizes[] = count($entityIds);
+
+            return count($entityIds);
+        });
+
+        $r = $this->worker()->drain(null, 20000, 12);
+
+        self::assertSame([10000, 1], $sizes, 'split at the engine ceiling, not sent whole');
+        self::assertSame(10001, $r['deleted']);
         self::assertSame(0, DB::table('pulseindex_outbox')->count());
     }
 

@@ -26,6 +26,20 @@ An id that is not a non-negative integer names its own position in the message
 and nothing is sent, so a bad value in a page of ten thousand does not leave you
 bisecting your own input against a server error.
 
+### The outbox worker uses it
+
+`OutboxWorker` batched its upserts and then deleted one row at a time, because
+there was nothing else to call. A drain claiming a thousand deletes made a
+thousand round trips.
+
+That was merely slow while the engine did not count deletes against the per-key
+ceiling. The engine counts them now, so the same drain would have spent the
+whole ceiling and left rows backing off and eventually parking. It is one call
+per tenant, split at the engine's batch maximum.
+
+Nothing to change on your side — `outbox:work` and `pulseindex:reindex` behave
+the same and finish sooner.
+
 ## 3.1.0
 
 ### A radius, and each whereIn, no longer merge into one OR
