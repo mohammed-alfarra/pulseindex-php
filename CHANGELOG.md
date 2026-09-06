@@ -1,6 +1,45 @@
 # Changelog
 
-## 3.2.0
+## 4.0.0
+
+**A major, not a minor.** The previous draft of these notes said 3.2.0. Checking
+what actually breaks says otherwise, so the number says otherwise too.
+
+### Breaking
+
+1. **`withinRadius` returns different results.** It has to: above 8 km it was
+   returning **nothing at all**, and below that it over-matched by up to 5.4x.
+   Measured against a real engine with 20,000 points:
+
+   | radius | true | before | after |
+   |--------|-----:|-------:|------:|
+   | 2 km   | 7    | 38     | 9     |
+   | 5 km   | 36   | 109    | 42    |
+   | 15 km  | 386  | **0**  | 518   |
+   | 50 km  | 4,282| **0**  | 4,800 |
+
+2. **`getCoveringHashes()` refuses a precision nothing is indexed at.** Passing
+   4 used to return cells that matched no entity; it now throws.
+
+3. **A radius too large for the indexed precisions is refused**, naming the
+   latitude. Cells narrow toward the poles, so 50 km is available to about 82
+   degrees and 15 km to about 89. Previously such a request came back
+   silently covering a fraction of its own circle.
+
+4. **`ClientInterface` gained two methods.** Anything implementing it directly
+   must add `batchDelete()` and `searchWithTotal()`. Mocks and the shipped
+   `Client` are unaffected.
+
+### Migrating
+
+Nothing to change for the common case: index the same way, call `withinRadius`
+the same way, and get results that are actually inside the radius you asked for.
+
+If you pinned expectations to the old counts, they will move. If you passed an
+explicit precision, pass one of the indexed precisions or drop the argument. If
+you search above 80 degrees latitude at a large radius, catch the refusal.
+
+### Everything else in this release
 
 ### The total on a paged search is not the number of matches
 
