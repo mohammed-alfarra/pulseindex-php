@@ -70,12 +70,23 @@ final class GeoHash
      * precision is worth its cell count.
      *
      * Cells are rectangles and the query is a circle, so some excess is not
-     * optional. 2.0 is where the measured choices come out right at every
-     * radius: it rejects precision 5 at 2 km (6.91x) and at 5 km (2.76x) and
-     * accepts it at 15 km (1.44x), which is also where the cell count turns
-     * from 47 into 1,120.
+     * optional — and `withinRadius` is a pre-filter the caller narrows exactly
+     * afterwards, so excess is cheaper than predicates.
+     *
+     * 2.0 was the first attempt and it was too strict. It rejected precision 5
+     * at 5 km, so a covering that had cost 10 cells cost 167, and the demo
+     * benchmark went from beating PostgreSQL to losing to it by 2.76x on wall
+     * time — the cost is the request, not the search. 3.0 keeps the cheap
+     * covering at 5 km and still rejects precision 5 at 2 km, where it wastes
+     * 4.73x to 6.91x depending on latitude.
+     *
+     * | radius | prec 5            | prec 6              | chosen |
+     * |--------|-------------------|---------------------|--------|
+     * | 2 km   | 4 cells, 6.91x    | 32 cells, 1.73x     | 6      |
+     * | 5 km   | 10 cells, 2.76x   | 140 cells, 1.21x    | 5      |
+     * | 15 km  | 47 cells, 1.44x   | 1,120 cells, 1.07x  | 5      |
      */
-    public const ACCEPTABLE_COVER_RATIO = 2.0;
+    public const ACCEPTABLE_COVER_RATIO = 3.0;
 
     /**
      * Neighbor charset keyed by direction then even/odd hash length (0 = even).

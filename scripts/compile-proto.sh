@@ -95,6 +95,24 @@ protoc \
   -I "${PROTO_DIR}" \
   "${PROTO_FILE}"
 
+# health.proto too, and for a reason that cost a release to learn: the wipe
+# above removes all of GPBMetadata, and generating only engine.proto put back
+# just its half. Grpc\Health\V1\HealthCheckResponse calls
+# \GPBMetadata\Health::initOnce() on construction, so every health check threw
+# "Class GPBMetadata\Health not found" from v3.1.0 onward — the class was
+# deleted by a build, not by a decision, and nothing regenerated it.
+HEALTH_PROTO="${PROTO_DIR}/health.proto"
+if [[ -f "${HEALTH_PROTO}" ]]; then
+  echo "Generating PHP health classes..."
+  protoc \
+    --php_out="${OUT_DIR}" \
+    -I "${PROTO_DIR}" \
+    "${HEALTH_PROTO}"
+else
+  echo "error: ${HEALTH_PROTO} is missing; the health client cannot be generated" >&2
+  exit 1
+fi
+
 echo "Generating gRPC client via grpc_php_plugin..."
 protoc \
   --plugin=protoc-gen-grpc="$(command -v grpc_php_plugin)" \

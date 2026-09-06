@@ -30,6 +30,29 @@ what actually breaks says otherwise, so the number says otherwise too.
    must add `batchDelete()` and `searchWithTotal()`. Mocks and the shipped
    `Client` are unaffected.
 
+### The published package could not create its own table
+
+`.gitattributes` carried `/database export-ignore`, and the only thing under
+`database/` is the outbox migration the service provider loads. Every install
+from v3.1.0 onward therefore shipped a provider whose `loadMigrationsFrom()`
+pointed at a directory that was not there: `php artisan migrate` reported
+nothing to run, and the first model sync failed with *relation
+pulseindex_outbox does not exist*. A package that installs cleanly and cannot
+work.
+
+### Every health check threw
+
+`Grpc\Health\V1\HealthCheckResponse` calls `\GPBMetadata\Health::initOnce()`
+when it is constructed, and that class was deleted by a build rather than by a
+decision: `compile-proto.sh` wipes the whole `GPBMetadata` directory and used to
+regenerate only `engine.proto`'s half of it. `pulse:health` reported
+*Class "GPBMetadata\Health" not found* on every run from v3.1.0.
+
+Two tests now guard both: one asserts the dist archive carries every path the
+installed package reads — deriving them from the service provider rather than
+repeating them — and one asserts every `GPBMetadata` class the generated code
+initialises exists.
+
 ### Migrating
 
 Nothing to change for the common case: index the same way, call `withinRadius`

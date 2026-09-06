@@ -21,7 +21,17 @@
 /tests              export-ignore
 /scripts            export-ignore
 /.github            export-ignore
-/database           export-ignore
+# NOT /database: the outbox migration lives there, and the service provider
+# loads it from the installed package. Excluding the whole directory shipped a
+# provider whose loadMigrationsFrom() points at a path that does not exist, so
+# `php artisan migrate` created no outbox table and every Laravel install failed
+# on the first sync with "relation pulseindex_outbox does not exist". Verified
+# against v3.1.0 and v4.0.0: both archives carried zero files under database/.
+#
+# Only the migrations are shipped; seeders and factories, if any are ever added,
+# stay behind.
+/database/factories export-ignore
+/database/seeders   export-ignore
 /docs               export-ignore
 /Dockerfile         export-ignore
 /Dockerfile.frankenphp export-ignore

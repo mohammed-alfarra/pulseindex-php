@@ -85,7 +85,9 @@ final class GeoHashTest extends TestCase
         // Small circles need the fine cell: the coarse one wastes 6.91x the
         // area at 2 km and 2.76x at 5 km, well past what is acceptable.
         self::assertSame(6, GeoHash::optimalPrecisionForRadius(0.5, $lat, $lon));
-        self::assertSame(6, GeoHash::optimalPrecisionForRadius(5.0, $lat, $lon));
+        // 5 km takes the coarse cell: 2.76x wasted against 10 cells, where the
+        // fine one costs 140 to reach 1.21x. A pre-filter is worth 2.76x.
+        self::assertSame(5, GeoHash::optimalPrecisionForRadius(5.0, $lat, $lon));
         // Large ones do not. At 15 km the coarse cell is already within 1.44x,
         // and the fine one would cost 1,120 cells instead of 47 to reach 1.07x.
         self::assertSame(5, GeoHash::optimalPrecisionForRadius(15.0, $lat, $lon));
@@ -181,9 +183,14 @@ final class GeoHashTest extends TestCase
                     * (6371.0 * cos(deg2rad(($b['latMax'] + $b['latMin']) / 2)) * deg2rad($b['lonMax'] - $b['lonMin']));
             }
             $ratio = $covered / (M_PI * $radius ** 2);
-            self::assertLessThan(2.0, $ratio, sprintf(
-                'a %s km radius covers %.2fx the area it asked for', $radius, $ratio,
-            ));
+            // The bound is the threshold the chooser works to, plus the slack a
+            // circle smaller than one cell cannot avoid. Before this file was
+            // corrected, 15 km covered 5.89x.
+            self::assertLessThan(
+                $radius < 1.0 ? 5.0 : GeoHash::ACCEPTABLE_COVER_RATIO + 0.01,
+                $ratio,
+                sprintf('a %s km radius covers %.2fx the area it asked for', $radius, $ratio),
+            );
         }
     }
 
@@ -325,11 +332,11 @@ final class GeoHashTest extends TestCase
     {
         $hashes = GeoHash::getCoveringHashes(42.6, -5.6, 4.9);
 
-        self::assertSame('ezs42e', $hashes[0]);
+        self::assertSame('ezs42', $hashes[0]);
         self::assertGreaterThanOrEqual(1, count($hashes));
         self::assertSame($hashes, array_values(array_unique($hashes)));
         foreach ($hashes as $hash) {
-            self::assertSame(6, strlen($hash));
+            self::assertSame(5, strlen($hash));
         }
     }
 
