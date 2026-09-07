@@ -1,5 +1,57 @@
 # Changelog
 
+## 4.0.1
+
+Three defects found by installing 4.0.0 into a real Laravel application rather
+than reading it. All three predate 4.0.0; two of them predate 3.1.0.
+
+### The package could not create its own table
+
+`.gitattributes` carried `/database export-ignore`, and the only thing under
+`database/` is the outbox migration the service provider loads. Every install
+from v3.1.0 onward shipped a provider whose `loadMigrationsFrom()` pointed at a
+directory that was not in the archive:
+
+```
+php artisan migrate           →  "Nothing to migrate"
+first model sync              →  relation "pulseindex_outbox" does not exist
+```
+
+Verified against the v3.1.0 and v4.0.0 archives: both carried zero files under
+`database/`. Only factories and seeders are excluded now.
+
+### Every health check threw
+
+`Grpc\Health\V1\HealthCheckResponse` calls `\GPBMetadata\Health::initOnce()`
+when it is constructed, and that class was deleted by a build rather than by a
+decision: `compile-proto.sh` wipes the whole `GPBMetadata` directory and
+regenerated only `engine.proto`'s half of it. `pulse:health` reported
+*Class "GPBMetadata\Health" not found* on every run from v3.1.0.
+
+### The covering threshold, corrected against a real app
+
+`withinRadius` is a pre-filter the caller narrows exactly afterwards, so excess
+area is cheaper than predicates. 4.0.0's threshold was too strict: it rejected
+the coarse cell at 5 km, turning a 10-cell covering into 167, and a real demo
+app's benchmark went from beating PostgreSQL to losing to it. Measured on
+100,000 properties at a 5 km radius:
+
+| | 4.0.0 | 4.0.1 |
+|---|---|---|
+| covering | 167 cells | 10 cells |
+| p50 wall | 3,082 µs | 926 µs |
+| against PostgreSQL | 2.76× slower | 1.35× faster |
+
+The coarse cell is now taken up to 3.0× the circle, which still rejects it at
+2 km where it wastes 4.73× to 6.91×.
+
+### Guards
+
+Two tests now cover the packaging: one derives the paths the installed package
+reads from the service provider itself and asserts the dist archive carries
+them, and one asserts every `GPBMetadata` class the generated code initialises
+exists. Neither defect was reachable by any test that read only the repository.
+
 ## 4.0.0
 
 **A major, not a minor.** The previous draft of these notes said 3.2.0. Checking
@@ -29,48 +81,6 @@ what actually breaks says otherwise, so the number says otherwise too.
 4. **`ClientInterface` gained two methods.** Anything implementing it directly
    must add `batchDelete()` and `searchWithTotal()`. Mocks and the shipped
    `Client` are unaffected.
-
-### The published package could not create its own table
-
-`.gitattributes` carried `/database export-ignore`, and the only thing under
-`database/` is the outbox migration the service provider loads. Every install
-from v3.1.0 onward therefore shipped a provider whose `loadMigrationsFrom()`
-pointed at a directory that was not there: `php artisan migrate` reported
-nothing to run, and the first model sync failed with *relation
-pulseindex_outbox does not exist*. A package that installs cleanly and cannot
-work.
-
-### Every health check threw
-
-`Grpc\Health\V1\HealthCheckResponse` calls `\GPBMetadata\Health::initOnce()`
-when it is constructed, and that class was deleted by a build rather than by a
-decision: `compile-proto.sh` wipes the whole `GPBMetadata` directory and used to
-regenerate only `engine.proto`'s half of it. `pulse:health` reported
-*Class "GPBMetadata\Health" not found* on every run from v3.1.0.
-
-Two tests now guard both: one asserts the dist archive carries every path the
-installed package reads — deriving them from the service provider rather than
-repeating them — and one asserts every `GPBMetadata` class the generated code
-initialises exists.
-
-### The covering threshold, corrected against a real app
-
-`withinRadius` is a pre-filter the caller narrows exactly afterwards, so excess
-area is cheaper than predicates. The first threshold was too strict: it rejected
-the coarse cell at 5 km, turning a 10-cell covering into 167, and a real demo
-app's benchmark went from beating PostgreSQL to losing to it by 2.76x on wall
-time. The cost is the request, not the search.
-
-Measured in that app, 100,000 properties, 5 km radius:
-
-| | before | after |
-|---|---|---|
-| covering | 167 cells | 10 cells |
-| p50 wall | 3,082 us | 926 us |
-| against PostgreSQL | 2.76x slower | 1.35x faster |
-
-The coarse cell is now taken up to 3.0x the circle, which still rejects it at
-2 km where it wastes 4.73x to 6.91x.
 
 ### Migrating
 
