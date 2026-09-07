@@ -31,7 +31,8 @@
     "suggest": {
         "illuminate/database": "Required to use the PulseSearchable Eloquent trait and hydrator",
         "illuminate/pagination": "Required to use PulseQueryBuilder::paginate()",
-        "illuminate/support": "Required for the Laravel service provider and facade"
+        "illuminate/support": "Required for the Laravel service provider and facade",
+        "ext-protobuf": "Google's protobuf C extension. Optional, and measured worth it on queries that carry many predicates: a 30 km withinRadius (184 geohash cells) went from 3,503 to 2,387 microseconds end to end, 32% faster. Small queries are barely affected."
     },
     "autoload": {
         "psr-4": {

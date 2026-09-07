@@ -259,6 +259,13 @@ $result = $client->search(
 > outside the radius — about 1.1x to 1.8x the circle's area. The engine stores no
 > coordinates, so filter the remainder from your own data after hydration.
 
+> **Install `ext-protobuf` if your queries carry many predicates.** The pure-PHP
+> protobuf implementation is the fallback, and it is the dominant cost once a
+> request grows: a 30 km `withinRadius` expands into 184 geohash cells and went
+> from 3,503 to 2,387 microseconds end to end with the extension loaded, 32%
+> faster. `pecl install protobuf && docker-php-ext-enable protobuf`. Small
+> queries are barely affected.
+
 $ids = $result->matchedEntityIds;
 
 // Clearing many rows: send ids in pages of up to 10,000. A larger page is
