@@ -17,21 +17,26 @@ use Google\Protobuf\RepeatedField;
 class RangePredicate extends \Google\Protobuf\Internal\Message
 {
     /**
-     * Numeric field name. Currently supported: "price".
+     * Numeric field name — whatever you called it in
+     * IndexEntityRequest.numbers.
+     * A search naming a field no entity in your tenant carries is refused rather
+     * than answered: it can only match nothing, and an empty page looks exactly
+     * like a real one.
      *
      * Generated from protobuf field <code>string field = 1;</code>
      */
     protected $field = '';
     /**
      * Inclusive lower bound of the requested range.
+     * int64, so a bound may be negative and may go past 4,294,967,295.
      *
-     * Generated from protobuf field <code>uint32 min_val = 2;</code>
+     * Generated from protobuf field <code>int64 min_val = 2;</code>
      */
     protected $min_val = 0;
     /**
      * Inclusive upper bound of the requested range.
      *
-     * Generated from protobuf field <code>uint32 max_val = 3;</code>
+     * Generated from protobuf field <code>int64 max_val = 3;</code>
      */
     protected $max_val = 0;
 
@@ -42,10 +47,15 @@ class RangePredicate extends \Google\Protobuf\Internal\Message
      *     Optional. Data for populating the Message object.
      *
      *     @type string $field
-     *           Numeric field name. Currently supported: "price".
-     *     @type int $min_val
+     *           Numeric field name — whatever you called it in
+     *           IndexEntityRequest.numbers.
+     *           A search naming a field no entity in your tenant carries is refused rather
+     *           than answered: it can only match nothing, and an empty page looks exactly
+     *           like a real one.
+     *     @type int|string $min_val
      *           Inclusive lower bound of the requested range.
-     *     @type int $max_val
+     *           int64, so a bound may be negative and may go past 4,294,967,295.
+     *     @type int|string $max_val
      *           Inclusive upper bound of the requested range.
      * }
      */
@@ -56,7 +66,11 @@ class RangePredicate extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Numeric field name. Currently supported: "price".
+     * Numeric field name — whatever you called it in
+     * IndexEntityRequest.numbers.
+     * A search naming a field no entity in your tenant carries is refused rather
+     * than answered: it can only match nothing, and an empty page looks exactly
+     * like a real one.
      *
      * Generated from protobuf field <code>string field = 1;</code>
      * @return string
@@ -67,7 +81,11 @@ class RangePredicate extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Numeric field name. Currently supported: "price".
+     * Numeric field name — whatever you called it in
+     * IndexEntityRequest.numbers.
+     * A search naming a field no entity in your tenant carries is refused rather
+     * than answered: it can only match nothing, and an empty page looks exactly
+     * like a real one.
      *
      * Generated from protobuf field <code>string field = 1;</code>
      * @param string $var
@@ -83,9 +101,10 @@ class RangePredicate extends \Google\Protobuf\Internal\Message
 
     /**
      * Inclusive lower bound of the requested range.
+     * int64, so a bound may be negative and may go past 4,294,967,295.
      *
-     * Generated from protobuf field <code>uint32 min_val = 2;</code>
-     * @return int
+     * Generated from protobuf field <code>int64 min_val = 2;</code>
+     * @return int|string
      */
     public function getMinVal()
     {
@@ -94,14 +113,15 @@ class RangePredicate extends \Google\Protobuf\Internal\Message
 
     /**
      * Inclusive lower bound of the requested range.
+     * int64, so a bound may be negative and may go past 4,294,967,295.
      *
-     * Generated from protobuf field <code>uint32 min_val = 2;</code>
-     * @param int $var
+     * Generated from protobuf field <code>int64 min_val = 2;</code>
+     * @param int|string $var
      * @return $this
      */
-    public function setMinVal(int $var)
+    public function setMinVal(int|string $var)
     {
-        GPBUtil::checkUint32($var);
+        GPBUtil::checkInt64($var);
         $this->min_val = $var;
 
         return $this;
@@ -110,8 +130,8 @@ class RangePredicate extends \Google\Protobuf\Internal\Message
     /**
      * Inclusive upper bound of the requested range.
      *
-     * Generated from protobuf field <code>uint32 max_val = 3;</code>
-     * @return int
+     * Generated from protobuf field <code>int64 max_val = 3;</code>
+     * @return int|string
      */
     public function getMaxVal()
     {
@@ -121,13 +141,13 @@ class RangePredicate extends \Google\Protobuf\Internal\Message
     /**
      * Inclusive upper bound of the requested range.
      *
-     * Generated from protobuf field <code>uint32 max_val = 3;</code>
-     * @param int $var
+     * Generated from protobuf field <code>int64 max_val = 3;</code>
+     * @param int|string $var
      * @return $this
      */
-    public function setMaxVal(int $var)
+    public function setMaxVal(int|string $var)
     {
-        GPBUtil::checkUint32($var);
+        GPBUtil::checkInt64($var);
         $this->max_val = $var;
 
         return $this;

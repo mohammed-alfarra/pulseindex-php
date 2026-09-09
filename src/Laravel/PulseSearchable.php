@@ -91,21 +91,31 @@ trait PulseSearchable
         return (string) ($this->getAttribute('tenant_id') ?? $configured ?? '');
     }
 
-    public function pulsePrice(): int
+    /**
+     * The model's numeric fields, under your own names.
+     *
+     * Return whatever your records actually hold:
+     * `['price_cents' => 45000, 'bedrooms' => 3]`. This replaced `pulsePrice()`
+     * and `pulseLocationPrefix()`, which named two fields on your behalf and
+     * gave you room for no others.
+     *
+     * @return array<string, int>
+     */
+    public function pulseNumbers(): array
     {
         $data = $this->toPulseSearchableArray();
 
-        return (int) ($data['price'] ?? $this->getAttribute('price') ?? 0);
-    }
+        /** @var array<string, int|float|string> $numbers */
+        $numbers = $data['numbers'] ?? [];
 
-    public function pulseLocationPrefix(): int
-    {
-        $data = $this->toPulseSearchableArray();
+        $out = [];
+        foreach ($numbers as $name => $value) {
+            if (is_numeric($value)) {
+                $out[(string) $name] = (int) $value;
+            }
+        }
 
-        return (int) ($data['location_prefix']
-            ?? $data['locationPrefix']
-            ?? $this->getAttribute('location_prefix')
-            ?? 0);
+        return $out;
     }
 
     public function pulseLatitude(): ?float
@@ -184,9 +194,7 @@ trait PulseSearchable
         $skip = array_flip([
             $this->getKeyName(),
             'id',
-            'price',
-            'location_prefix',
-            'locationPrefix',
+            'numbers',
             'tenant_id',
             'tenantId',
             'latitude',
@@ -252,8 +260,7 @@ trait PulseSearchable
         return new Entity(
             entityId: $this->getPulseEntityId(),
             categories: $this->pulseCategories(),
-            price: $this->pulsePrice(),
-            locationPrefix: $this->pulseLocationPrefix(),
+            numbers: $this->pulseNumbers(),
             tenantId: $this->pulseTenantId(),
         );
     }

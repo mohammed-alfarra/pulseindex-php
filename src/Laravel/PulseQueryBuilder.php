@@ -25,8 +25,6 @@ final class PulseQueryBuilder
 {
     private ?string $tenantId = null;
 
-    private ?int $locationPrefix = null;
-
     /**
      * A page unless the caller asks for another size.
      *
@@ -78,13 +76,6 @@ final class PulseQueryBuilder
     public function tenant(string $tenantId): self
     {
         $this->tenantId = $tenantId;
-
-        return $this;
-    }
-
-    public function location(int $locationPrefix): self
-    {
-        $this->locationPrefix = $locationPrefix;
 
         return $this;
     }
@@ -188,10 +179,6 @@ final class PulseQueryBuilder
         $tenant = $this->tenantId ?? $this->newModel()->pulseTenantId();
         if ($tenant !== '') {
             $query = $query->tenant($tenant);
-        }
-
-        if ($this->locationPrefix !== null) {
-            $query = $query->location($this->locationPrefix);
         }
 
         foreach ($this->must as $attribute) {

@@ -182,15 +182,13 @@ final class Client implements ClientInterface
     public function indexEntity(
         int $entityId,
         array $categories = [],
-        int $price = 0,
-        int $locationPrefix = 0,
+        array $numbers = [],
         string $tenantId = '',
     ): bool {
         $request = new IndexEntityRequest();
         $request->setEntityId($entityId);
         $request->setCategories(array_values($categories));
-        $request->setPrice($price);
-        $request->setLocationPrefix($locationPrefix);
+        $request->setNumbers($numbers);
         $request->setTenantId($tenantId);
 
         /** @var \PulseIndex\Engine\V1\IndexEntityResponse $response */
@@ -204,8 +202,7 @@ final class Client implements ClientInterface
         return $this->indexEntity(
             $entity->entityId,
             $entity->categories,
-            $entity->price,
-            $entity->locationPrefix,
+            $entity->numbers,
             $entity->tenantId,
         );
     }
@@ -227,8 +224,7 @@ final class Client implements ClientInterface
             $request = new IndexEntityRequest();
             $request->setEntityId($entity->entityId);
             $request->setCategories($entity->categories);
-            $request->setPrice($entity->price);
-            $request->setLocationPrefix($entity->locationPrefix);
+            $request->setNumbers($entity->numbers);
             $request->setTenantId($entity->tenantId);
             $messages[] = $request;
         }
@@ -324,10 +320,11 @@ final class Client implements ClientInterface
             matchedEntityIds: $ids,
             totalMatches: (int) $response->getTotalMatches(),
             executionTimeUs: (int) $response->getExecutionTimeUs(),
-            // Exact only when nothing made the engine stop early. limit=0 asks
-            // for the count and no ids, and is the only shape that counts every
-            // match; any page can early-exit as soon as it is full.
-            totalIsExact: $query->toArray()['limit'] === 0,
+            // The engine says so now. This used to be inferred from limit === 0,
+            // a rule this SDK had to keep in step with the engine's own by hand,
+            // and which called a page inexact even when every match fit inside
+            // it and nothing was skipped.
+            totalIsExact: (bool) $response->getTotalIsExact(),
         );
     }
 
@@ -340,24 +337,14 @@ final class Client implements ClientInterface
      * reported 10,866 for a page of 100. Anything that prints "page 1 of N"
      * from that number is wrong by an order of magnitude and looks fine.
      *
-     * This sends the count query as well, so it costs two round trips and
-     * returns a total you can divide by a page size.
+     * One request. This used to run the whole query twice - once for the page,
+     * once for the count - because the wire had no way to ask for both. It does
+     * now, so this is the same round trip with exactTotal set, and the total it
+     * returns can be divided by a page size.
      */
     public function searchWithTotal(QueryBuilder $query): SearchResult
     {
-        $page = $this->search($query);
-        if ($page->totalIsExact) {
-            return $page;
-        }
-
-        $count = $this->search($query->limit(0));
-
-        return new SearchResult(
-            matchedEntityIds: $page->matchedEntityIds,
-            totalMatches: $count->totalMatches,
-            executionTimeUs: $page->executionTimeUs + $count->executionTimeUs,
-            totalIsExact: true,
-        );
+        return $this->search($query->exactTotal());
     }
 
 

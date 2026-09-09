@@ -65,13 +65,20 @@ message IndexEntityRequest {
   // Dense, ascending ids index and query most efficiently.
   uint64 entity_id = 1;
 
-  // Optional geohash-style location prefix. Matches the `location_prefix`
-  // filter on Search, and `location:<prefix>` as an attribute.
-  // Use 0 to omit location indexing.
-  uint64 location_prefix = 2;
+  reserved 2, 3;
+  reserved "location_prefix", "price";
 
-  // Numeric price (or similar scalar), filterable through RangePredicate.
-  uint32 price = 3;
+  // Numeric fields under your own names. Any name, any int64, any number of
+  // them, each filterable through RangePredicate and orderable through
+  // SortSpec. A name means nothing to the engine beyond its hash, so call them
+  // whatever your own records call them:
+  //
+  //   {"price_cents": 45000, "bedrooms": 3, "built_at": 1712000000}
+  //
+  // This replaces a single uint32 named `price` and a uint64 bitfield named
+  // `location_prefix` — one number per record, under a name the engine chose,
+  // with no negatives and nothing past 4,294,967,295.
+  map<string, int64> numbers = 6;
 
   // Attribute tokens already namespaced by the client, e.g.:
   //   "feature:pool", "furnishing:full", "amenity:parking"
@@ -177,14 +184,20 @@ message FilterPredicate {
 
 // RangePredicate filters a continuous numeric field to an inclusive range.
 message RangePredicate {
-  // Numeric field name. Currently supported: "price".
+  // Numeric field name — whatever you called it in
+  // IndexEntityRequest.numbers.
+  //
+  // A search naming a field no entity in your tenant carries is refused rather
+  // than answered: it can only match nothing, and an empty page looks exactly
+  // like a real one.
   string field = 1;
 
   // Inclusive lower bound of the requested range.
-  uint32 min_val = 2;
+  // int64, so a bound may be negative and may go past 4,294,967,295.
+  int64 min_val = 2;
 
   // Inclusive upper bound of the requested range.
-  uint32 max_val = 3;
+  int64 max_val = 3;
 }
 
 // SortSpec orders a page by a numeric field.
@@ -197,7 +210,10 @@ message RangePredicate {
 // anywhere in the tenant, so it costs more than the same filter unordered.
 // offset + limit is capped at 100,000.
 message SortSpec {
-  // Numeric field name, the same one a RangePredicate would name.
+  // Numeric field name, the same one a RangePredicate would name, and bounded
+  // the same way: a name no entity carries is refused, not silently ignored.
+  // An order by one used to leave the page in insertion order and call it
+  // sorted.
   string field = 1;
 
   // Largest first when true; smallest first otherwise.
@@ -210,9 +226,8 @@ message SortSpec {
 
 // SearchQueryRequest executes a filtered search inside one tenant.
 message SearchQueryRequest {
-  // Optional location constraint (0 = no location filter).
-  // When non-zero, only entities indexed with that location_prefix match.
-  uint64 location_prefix = 1;
+  reserved 1;
+  reserved "location_prefix";
 
   // Attribute predicates (MUST / SHOULD / MUST_NOT). Order does not affect the
   // result.
@@ -234,6 +249,16 @@ message SearchQueryRequest {
 
   // Optional ordering. Absent returns matches in entity-id order.
   SortSpec sort = 7;
+
+  // Count every match instead of stopping as soon as the page is full.
+  //
+  // A page query stops early, so the count it carries is only what the chunks
+  // it opened added up to. That is usually what a page wants, and it is much
+  // cheaper. Set this when you need the exact total alongside the page: one
+  // request instead of two, and total_is_exact comes back true.
+  //
+  // limit == 0 already implies it: a count-only request has no page to fill.
+  bool exact_total = 8;
 }
 
 // SearchQueryResponse returns matched ids and timing metadata.
@@ -242,9 +267,21 @@ message SearchQueryResponse {
   // Caller hydrates full records from the primary data store.
   repeated uint64 matched_entity_ids = 1;
 
-  // Number of matches. Exact when `limit` is 0; may be approximate otherwise.
+  // How many entities matched. Exact when total_is_exact; otherwise a lower
+  // bound - read that field before showing this number to anyone.
   uint32 total_matches = 2;
 
   // Server-side execution time in microseconds (excludes network RTT).
   uint64 execution_time_us = 3;
+
+  // Whether total_matches is the whole answer.
+  //
+  // False means the scan stopped once the page was full, so the count is only
+  // as far as it got. It does not look partial: on 500,000 records that all
+  // matched, a `limit 20` query reported 65,536. Send exact_total to get a
+  // true count in the same request.
+  //
+  // True whenever the scan finished, which includes a page query whose matches
+  // all fit inside it: nothing was skipped, so nothing is missing.
+  bool total_is_exact = 4;
 }

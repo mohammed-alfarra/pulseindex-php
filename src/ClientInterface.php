@@ -14,8 +14,7 @@ interface ClientInterface
     public function indexEntity(
         int $entityId,
         array $categories = [],
-        int $price = 0,
-        int $locationPrefix = 0,
+        array $numbers = [],
         string $tenantId = '',
     ): bool;
 

@@ -44,13 +44,11 @@ final class QueryBuilderTest extends TestCase
             ->should('amenity:parking')
             ->mustNot('feature:shared')
             ->range('price', 100, 500)
-            ->location(42)
             ->limit(25)
             ->offset(10);
 
         self::assertSame([], $base->toArray()['filters']);
         self::assertSame('acme', $built->toArray()['tenant_id']);
-        self::assertSame(42, $built->toArray()['location_prefix']);
         self::assertSame(25, $built->toArray()['limit']);
         self::assertSame(10, $built->toArray()['offset']);
         // Group 0 throughout: a predicate that names no disjunction shares
@@ -91,15 +89,13 @@ final class QueryBuilderTest extends TestCase
         $entity = Entity::fromArray([
             'entity_id' => 99,
             'categories' => ['feature:pool'],
-            'price' => 1200,
-            'locationPrefix' => 7,
+            'numbers' => ['price_cents' => 120000, 'bedrooms' => 3],
             'tenantId' => 't1',
         ]);
 
         self::assertSame(99, $entity->entityId);
         self::assertSame(['feature:pool'], $entity->categories);
-        self::assertSame(1200, $entity->price);
-        self::assertSame(7, $entity->locationPrefix);
+        self::assertSame(['price_cents' => 120000, 'bedrooms' => 3], $entity->numbers);
         self::assertSame('t1', $entity->tenantId);
     }
 

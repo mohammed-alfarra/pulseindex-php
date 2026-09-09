@@ -7,13 +7,17 @@ namespace PulseIndex;
 final class Entity
 {
     /**
-     * @param list<string> $categories
+     * @param list<string>       $categories
+     * @param array<string, int> $numbers Numeric fields under your own names.
+     *                                    Any name, any integer, any number of
+     *                                    them. This replaced a single `price`
+     *                                    and a `locationPrefix` that the SDK
+     *                                    named on your behalf.
      */
     public function __construct(
         public readonly int $entityId,
         public readonly array $categories = [],
-        public readonly int $price = 0,
-        public readonly int $locationPrefix = 0,
+        public readonly array $numbers = [],
         public readonly string $tenantId = '',
     ) {
     }
@@ -23,9 +27,7 @@ final class Entity
      *     entity_id?: int|string,
      *     entityId?: int|string,
      *     categories?: list<string>,
-     *     price?: int,
-     *     location_prefix?: int|string,
-     *     locationPrefix?: int|string,
+     *     numbers?: array<string, int|float|string>,
      *     tenant_id?: string,
      *     tenantId?: string
      * } $data
@@ -35,9 +37,43 @@ final class Entity
         return new self(
             entityId: (int) ($data['entity_id'] ?? $data['entityId'] ?? 0),
             categories: array_values($data['categories'] ?? []),
-            price: (int) ($data['price'] ?? 0),
-            locationPrefix: (int) ($data['location_prefix'] ?? $data['locationPrefix'] ?? 0),
+            numbers: self::normaliseNumbers($data['numbers'] ?? []),
             tenantId: (string) ($data['tenant_id'] ?? $data['tenantId'] ?? ''),
         );
+    }
+
+    /**
+     * One record's numeric fields, as the engine stores them.
+     *
+     * The engine's column is a 64-bit integer. A fraction is refused rather
+     * than truncated: 4.3 stored as 4 is a lie that nothing downstream can
+     * detect, and the SDK used to make it silently.
+     *
+     * @param  array<string, int|float|string> $numbers
+     * @return array<string, int>
+     */
+    private static function normaliseNumbers(array $numbers): array
+    {
+        $out = [];
+        foreach ($numbers as $name => $value) {
+            $name = (string) $name;
+            if (trim($name) === '') {
+                throw new \InvalidArgumentException('A numeric field name must not be empty.');
+            }
+            if (!is_numeric($value)) {
+                throw new \InvalidArgumentException(sprintf('%s must be a number.', $name));
+            }
+            if ((float) $value !== floor((float) $value)) {
+                throw new \InvalidArgumentException(sprintf(
+                    '%s is %s, and the engine stores whole numbers. Scale it to an integer and '
+                    . 'keep the scale on your side - a price in cents, a rating out of 100.',
+                    $name,
+                    (string) $value
+                ));
+            }
+            $out[$name] = (int) $value;
+        }
+
+        return $out;
     }
 }

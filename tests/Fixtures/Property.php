@@ -45,7 +45,7 @@ final class Property extends Model
         return [
             'categories' => $this->tags ?? [],
             'status' => $this->status,
-            'price' => $this->price,
+            'numbers' => ['price' => $this->price],
             'latitude' => $this->latitude,
             'longitude' => $this->longitude,
         ];

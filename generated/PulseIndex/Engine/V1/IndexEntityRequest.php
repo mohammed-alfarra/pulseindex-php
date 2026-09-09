@@ -26,19 +26,18 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
      */
     protected $entity_id = 0;
     /**
-     * Optional geohash-style location prefix. Matches the `location_prefix`
-     * filter on Search, and `location:<prefix>` as an attribute.
-     * Use 0 to omit location indexing.
+     * Numeric fields under your own names. Any name, any int64, any number of
+     * them, each filterable through RangePredicate and orderable through
+     * SortSpec. A name means nothing to the engine beyond its hash, so call them
+     * whatever your own records call them:
+     *   {"price_cents": 45000, "bedrooms": 3, "built_at": 1712000000}
+     * This replaces a single uint32 named `price` and a uint64 bitfield named
+     * `location_prefix` — one number per record, under a name the engine chose,
+     * with no negatives and nothing past 4,294,967,295.
      *
-     * Generated from protobuf field <code>uint64 location_prefix = 2;</code>
+     * Generated from protobuf field <code>map<string, int64> numbers = 6;</code>
      */
-    protected $location_prefix = 0;
-    /**
-     * Numeric price (or similar scalar), filterable through RangePredicate.
-     *
-     * Generated from protobuf field <code>uint32 price = 3;</code>
-     */
-    protected $price = 0;
+    private $numbers;
     /**
      * Attribute tokens already namespaced by the client, e.g.:
      *   "feature:pool", "furnishing:full", "amenity:parking"
@@ -64,12 +63,15 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
      *     @type int|string $entity_id
      *           Stable application-level entity identifier (e.g. listing id).
      *           Dense, ascending ids index and query most efficiently.
-     *     @type int|string $location_prefix
-     *           Optional geohash-style location prefix. Matches the `location_prefix`
-     *           filter on Search, and `location:<prefix>` as an attribute.
-     *           Use 0 to omit location indexing.
-     *     @type int $price
-     *           Numeric price (or similar scalar), filterable through RangePredicate.
+     *     @type array|\Google\Protobuf\Internal\MapField $numbers
+     *           Numeric fields under your own names. Any name, any int64, any number of
+     *           them, each filterable through RangePredicate and orderable through
+     *           SortSpec. A name means nothing to the engine beyond its hash, so call them
+     *           whatever your own records call them:
+     *             {"price_cents": 45000, "bedrooms": 3, "built_at": 1712000000}
+     *           This replaces a single uint32 named `price` and a uint64 bitfield named
+     *           `location_prefix` — one number per record, under a name the engine chose,
+     *           with no negatives and nothing past 4,294,967,295.
      *     @type string[] $categories
      *           Attribute tokens already namespaced by the client, e.g.:
      *             "feature:pool", "furnishing:full", "amenity:parking"
@@ -114,57 +116,41 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Optional geohash-style location prefix. Matches the `location_prefix`
-     * filter on Search, and `location:<prefix>` as an attribute.
-     * Use 0 to omit location indexing.
+     * Numeric fields under your own names. Any name, any int64, any number of
+     * them, each filterable through RangePredicate and orderable through
+     * SortSpec. A name means nothing to the engine beyond its hash, so call them
+     * whatever your own records call them:
+     *   {"price_cents": 45000, "bedrooms": 3, "built_at": 1712000000}
+     * This replaces a single uint32 named `price` and a uint64 bitfield named
+     * `location_prefix` — one number per record, under a name the engine chose,
+     * with no negatives and nothing past 4,294,967,295.
      *
-     * Generated from protobuf field <code>uint64 location_prefix = 2;</code>
-     * @return int|string
+     * Generated from protobuf field <code>map<string, int64> numbers = 6;</code>
+     * @return \Google\Protobuf\Internal\MapField
      */
-    public function getLocationPrefix()
+    public function getNumbers()
     {
-        return $this->location_prefix;
+        return $this->numbers;
     }
 
     /**
-     * Optional geohash-style location prefix. Matches the `location_prefix`
-     * filter on Search, and `location:<prefix>` as an attribute.
-     * Use 0 to omit location indexing.
+     * Numeric fields under your own names. Any name, any int64, any number of
+     * them, each filterable through RangePredicate and orderable through
+     * SortSpec. A name means nothing to the engine beyond its hash, so call them
+     * whatever your own records call them:
+     *   {"price_cents": 45000, "bedrooms": 3, "built_at": 1712000000}
+     * This replaces a single uint32 named `price` and a uint64 bitfield named
+     * `location_prefix` — one number per record, under a name the engine chose,
+     * with no negatives and nothing past 4,294,967,295.
      *
-     * Generated from protobuf field <code>uint64 location_prefix = 2;</code>
-     * @param int|string $var
+     * Generated from protobuf field <code>map<string, int64> numbers = 6;</code>
+     * @param array|\Google\Protobuf\Internal\MapField $var
      * @return $this
      */
-    public function setLocationPrefix(int|string $var)
+    public function setNumbers(array|\Google\Protobuf\Internal\MapField $var)
     {
-        GPBUtil::checkUint64($var);
-        $this->location_prefix = $var;
-
-        return $this;
-    }
-
-    /**
-     * Numeric price (or similar scalar), filterable through RangePredicate.
-     *
-     * Generated from protobuf field <code>uint32 price = 3;</code>
-     * @return int
-     */
-    public function getPrice()
-    {
-        return $this->price;
-    }
-
-    /**
-     * Numeric price (or similar scalar), filterable through RangePredicate.
-     *
-     * Generated from protobuf field <code>uint32 price = 3;</code>
-     * @param int $var
-     * @return $this
-     */
-    public function setPrice(int $var)
-    {
-        GPBUtil::checkUint32($var);
-        $this->price = $var;
+        $arr = GPBUtil::checkMapField($var, \Google\Protobuf\Internal\GPBType::STRING, \Google\Protobuf\Internal\GPBType::INT64);
+        $this->numbers = $arr;
 
         return $this;
     }

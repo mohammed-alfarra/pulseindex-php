@@ -23,7 +23,10 @@ use Google\Protobuf\RepeatedField;
 class SortSpec extends \Google\Protobuf\Internal\Message
 {
     /**
-     * Numeric field name, the same one a RangePredicate would name.
+     * Numeric field name, the same one a RangePredicate would name, and bounded
+     * the same way: a name no entity carries is refused, not silently ignored.
+     * An order by one used to leave the page in insertion order and call it
+     * sorted.
      *
      * Generated from protobuf field <code>string field = 1;</code>
      */
@@ -42,7 +45,10 @@ class SortSpec extends \Google\Protobuf\Internal\Message
      *     Optional. Data for populating the Message object.
      *
      *     @type string $field
-     *           Numeric field name, the same one a RangePredicate would name.
+     *           Numeric field name, the same one a RangePredicate would name, and bounded
+     *           the same way: a name no entity carries is refused, not silently ignored.
+     *           An order by one used to leave the page in insertion order and call it
+     *           sorted.
      *     @type bool $descending
      *           Largest first when true; smallest first otherwise.
      * }
@@ -54,7 +60,10 @@ class SortSpec extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Numeric field name, the same one a RangePredicate would name.
+     * Numeric field name, the same one a RangePredicate would name, and bounded
+     * the same way: a name no entity carries is refused, not silently ignored.
+     * An order by one used to leave the page in insertion order and call it
+     * sorted.
      *
      * Generated from protobuf field <code>string field = 1;</code>
      * @return string
@@ -65,7 +74,10 @@ class SortSpec extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Numeric field name, the same one a RangePredicate would name.
+     * Numeric field name, the same one a RangePredicate would name, and bounded
+     * the same way: a name no entity carries is refused, not silently ignored.
+     * An order by one used to leave the page in insertion order and call it
+     * sorted.
      *
      * Generated from protobuf field <code>string field = 1;</code>
      * @param string $var

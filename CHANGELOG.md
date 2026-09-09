@@ -1,5 +1,79 @@
 # Changelog
 
+## Unreleased
+
+### The result count now says whether it is the whole count
+
+A paged search stops as soon as the page is full, so the `totalMatches` it
+carried was only what the engine had reached by then. Nothing said so, and it
+does not look partial: measured on 500,000 records that all matched, a page of
+20 reported **65,536**; a harder query reported **48,105** against a true total
+of **333,895**. Any interface printing "N results" from that was wrong by
+several times over and looked fine.
+
+`totalIsExact` now comes from the engine instead of being guessed from
+`limit === 0`, and `searchWithTotal()` is **one request instead of two** — the
+wire can ask for a page and a true count together. A page whose matches all fit
+inside it is reported exact, which the old guess got wrong.
+
+
+### A record carries whatever numbers you name, and no field the engine chose
+
+An entity used to be forced through one `uint32` called `price` and one `uint64`
+bitfield called `locationPrefix`. That is a schema this SDK had no business
+imposing: one number per record, under a name we picked, with no negatives, and
+nothing above 4,294,967,295. A rating, a capacity, a timestamp, an elevation and
+a balance were all the same field or no field at all.
+
+Both are gone. A record now carries `numbers`, under your own names:
+
+    new Entity(
+        entityId: 1001,
+        categories: ['feature:pool'],
+        numbers: ['price_cents' => 45000, 'bedrooms' => 3, 'built_at' => 1712000000],
+    )
+
+Any name, any 64-bit integer, any number of them, and every one is filterable
+through `range()` and orderable through `sortBy()`. A name means nothing to the
+engine beyond its hash.
+
+### Three things this fixes that were losing data quietly
+
+**A fraction was floored without a word.** `4.3` was sent as `4`, `0.5` as `0`,
+`199.99` as `199` — measured, not inferred. The engine's column is a 64-bit
+integer, so a fraction is refused now, with the scaling it needs named. Keep the
+scale on your side: a price in cents, a rating out of 100.
+
+**A field of your own called `price` disappeared.** Sixteen key names were
+reserved out of your attributes, and anything under one was dropped: measured,
+`{price: 250, rating: 4.3, lat: 41, kind: 'villa'}` came out as
+`["rating:4.3", "kind:villa"]` — `price` and `lat` gone, no error. Numbers go
+through `numbers` now, so nothing in your own object is swallowed.
+
+**A range or an order on a field nothing carries was answered, not refused.**
+It excluded every entity, or left the page in insertion order and reported it as
+sorted. At ten million records `bedrooms 3..6` returned 0 while the tag
+`bedrooms:3` returned 1,666,667. The engine refuses it by name now — but only
+when the tenant holds entities and none of them carries that field, because an
+empty tenant has nothing to be wrong about.
+
+### Migrating
+
+- `new Entity(id, categories, price: N, locationPrefix: P)` →
+  `new Entity(id, categories, numbers: ['price' => N])`.
+- `indexEntity($id, $categories, $price, $locationPrefix, $tenantId)` →
+  `indexEntity($id, $categories, $numbers, $tenantId)`.
+- On a Laravel model, `pulsePrice()` and `pulseLocationPrefix()` are replaced by
+  `pulseNumbers()`. Return `['numbers' => ['price' => $this->price]]` from
+  `toPulseSearchableArray()`; a bare `'price' => N` there is now a tag.
+- `.location(prefix)` on the query builder is gone. Nothing ever sent it: both
+  SDKs passed 0 on every request.
+- A range bound may now be negative or past 4,294,967,295.
+
+This needs an engine built from the same commit. The proto is a breaking change:
+field numbers 2 and 3 on `IndexEntityRequest`, and 1 on `SearchQueryRequest`, are
+reserved rather than reused.
+
 ## 4.0.1
 
 Three defects found by installing 4.0.0 into a real Laravel application rather

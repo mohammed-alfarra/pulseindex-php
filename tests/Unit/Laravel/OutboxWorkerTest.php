@@ -84,7 +84,7 @@ final class OutboxWorkerTest extends TestCase
         $received = [];
         $this->client->method('batchIndex')->willReturnCallback(function (array $entities) use (&$received): int {
             foreach ($entities as $e) {
-                $received[$e->entityId] = $e->price;
+                $received[$e->entityId] = $e->numbers['price'];
             }
 
             return count($entities);
@@ -224,7 +224,7 @@ final class OutboxWorkerTest extends TestCase
 
         $prices = [];
         $this->client->method('batchIndex')->willReturnCallback(function (array $entities) use (&$prices, $p): int {
-            $prices[] = $entities[0]->price;
+            $prices[] = $entities[0]->numbers['price'];
             if (count($prices) === 1) {
                 // simulate a concurrent write landing while this RPC is "in flight"
                 PulseSync::withoutSyncing(fn () => $p->update(['price' => 999]));

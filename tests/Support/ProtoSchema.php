@@ -63,7 +63,10 @@ final class ProtoSchema
             $body = (string) preg_replace('~\benum\s+\w+\s*\{[^}]*\}~', '', $body);
 
             preg_match_all(
-                '~(repeated\s+)?([\w.]+)\s+(\w+)\s*=\s*(\d+)\s*;~',
+                // map<k, v> is matched explicitly. It used to fall outside
+                // [\w.]+, so a map field was invisible here - the same blind
+                // spot that once let a customer RPC go missing unnoticed.
+                '~(repeated\s+)?(map\s*<\s*[\w.]+\s*,\s*[\w.]+\s*>|[\w.]+)\s+(\w+)\s*=\s*(\d+)\s*;~',
                 $body,
                 $fm,
                 PREG_SET_ORDER,
@@ -73,7 +76,9 @@ final class ProtoSchema
                     '%s:%s%s %s',
                     $f[4],
                     $f[1] !== '' ? 'repeated ' : '',
-                    $f[2],
+                    // Whitespace inside map<> is normalised so the two copies
+                    // compare on shape rather than on formatting.
+                    str_replace(',', ', ', preg_replace('~\s+~', '', $f[2]) ?? $f[2]),
                     $f[3],
                 ),
                 $fm,

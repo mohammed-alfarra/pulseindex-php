@@ -24,7 +24,8 @@ class SearchQueryResponse extends \Google\Protobuf\Internal\Message
      */
     private $matched_entity_ids;
     /**
-     * Number of matches. Exact when `limit` is 0; may be approximate otherwise.
+     * How many entities matched. Exact when total_is_exact; otherwise a lower
+     * bound - read that field before showing this number to anyone.
      *
      * Generated from protobuf field <code>uint32 total_matches = 2;</code>
      */
@@ -35,6 +36,18 @@ class SearchQueryResponse extends \Google\Protobuf\Internal\Message
      * Generated from protobuf field <code>uint64 execution_time_us = 3;</code>
      */
     protected $execution_time_us = 0;
+    /**
+     * Whether total_matches is the whole answer.
+     * False means the scan stopped once the page was full, so the count is only
+     * as far as it got. It does not look partial: on 500,000 records that all
+     * matched, a `limit 20` query reported 65,536. Send exact_total to get a
+     * true count in the same request.
+     * True whenever the scan finished, which includes a page query whose matches
+     * all fit inside it: nothing was skipped, so nothing is missing.
+     *
+     * Generated from protobuf field <code>bool total_is_exact = 4;</code>
+     */
+    protected $total_is_exact = false;
 
     /**
      * Constructor.
@@ -46,9 +59,18 @@ class SearchQueryResponse extends \Google\Protobuf\Internal\Message
      *           Entity IDs that satisfied all predicates (after offset/limit).
      *           Caller hydrates full records from the primary data store.
      *     @type int $total_matches
-     *           Number of matches. Exact when `limit` is 0; may be approximate otherwise.
+     *           How many entities matched. Exact when total_is_exact; otherwise a lower
+     *           bound - read that field before showing this number to anyone.
      *     @type int|string $execution_time_us
      *           Server-side execution time in microseconds (excludes network RTT).
+     *     @type bool $total_is_exact
+     *           Whether total_matches is the whole answer.
+     *           False means the scan stopped once the page was full, so the count is only
+     *           as far as it got. It does not look partial: on 500,000 records that all
+     *           matched, a `limit 20` query reported 65,536. Send exact_total to get a
+     *           true count in the same request.
+     *           True whenever the scan finished, which includes a page query whose matches
+     *           all fit inside it: nothing was skipped, so nothing is missing.
      * }
      */
     public function __construct($data = null)
@@ -86,7 +108,8 @@ class SearchQueryResponse extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Number of matches. Exact when `limit` is 0; may be approximate otherwise.
+     * How many entities matched. Exact when total_is_exact; otherwise a lower
+     * bound - read that field before showing this number to anyone.
      *
      * Generated from protobuf field <code>uint32 total_matches = 2;</code>
      * @return int
@@ -97,7 +120,8 @@ class SearchQueryResponse extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Number of matches. Exact when `limit` is 0; may be approximate otherwise.
+     * How many entities matched. Exact when total_is_exact; otherwise a lower
+     * bound - read that field before showing this number to anyone.
      *
      * Generated from protobuf field <code>uint32 total_matches = 2;</code>
      * @param int $var
@@ -133,6 +157,43 @@ class SearchQueryResponse extends \Google\Protobuf\Internal\Message
     {
         GPBUtil::checkUint64($var);
         $this->execution_time_us = $var;
+
+        return $this;
+    }
+
+    /**
+     * Whether total_matches is the whole answer.
+     * False means the scan stopped once the page was full, so the count is only
+     * as far as it got. It does not look partial: on 500,000 records that all
+     * matched, a `limit 20` query reported 65,536. Send exact_total to get a
+     * true count in the same request.
+     * True whenever the scan finished, which includes a page query whose matches
+     * all fit inside it: nothing was skipped, so nothing is missing.
+     *
+     * Generated from protobuf field <code>bool total_is_exact = 4;</code>
+     * @return bool
+     */
+    public function getTotalIsExact()
+    {
+        return $this->total_is_exact;
+    }
+
+    /**
+     * Whether total_matches is the whole answer.
+     * False means the scan stopped once the page was full, so the count is only
+     * as far as it got. It does not look partial: on 500,000 records that all
+     * matched, a `limit 20` query reported 65,536. Send exact_total to get a
+     * true count in the same request.
+     * True whenever the scan finished, which includes a page query whose matches
+     * all fit inside it: nothing was skipped, so nothing is missing.
+     *
+     * Generated from protobuf field <code>bool total_is_exact = 4;</code>
+     * @param bool $var
+     * @return $this
+     */
+    public function setTotalIsExact(bool $var)
+    {
+        $this->total_is_exact = $var;
 
         return $this;
     }

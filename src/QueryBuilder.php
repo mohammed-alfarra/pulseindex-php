@@ -28,11 +28,11 @@ final class QueryBuilder
 
     private string $tenantId = '';
 
-    private int $locationPrefix = 0;
-
     private int $limit = self::DEFAULT_LIMIT;
 
     private int $offset = 0;
+
+    private bool $exactTotal = false;
 
     /** @var list<array{op: int, attribute: string, group: int}> */
     private array $filters = [];
@@ -62,14 +62,6 @@ final class QueryBuilder
     {
         $clone = clone $this;
         $clone->tenantId = $tenantId;
-
-        return $clone;
-    }
-
-    public function location(int $locationPrefix): self
-    {
-        $clone = clone $this;
-        $clone->locationPrefix = $locationPrefix;
 
         return $clone;
     }
@@ -143,6 +135,15 @@ final class QueryBuilder
         return $clone;
     }
 
+    /**
+     * Filter on a numeric field's inclusive range.
+     *
+     * price is the only number an entity carries. Naming any other field is
+     * refused by the engine rather than answered, because a field nothing
+     * carries can only match nothing, and an empty page looks exactly like a
+     * real one. Model any other number as a category token instead:
+     * must('bedrooms:3'), or several in one SHOULD group for a range.
+     */
     public function range(string $field, int $min, int $max): self
     {
         $clone = clone $this;
@@ -194,9 +195,12 @@ final class QueryBuilder
     }
 
     /**
-     * Order the page by a numeric field. Rows carrying no value for it sort
-     * last in both directions; they still count towards totalMatches, they
-     * simply have nothing to be ordered by.
+     * Order the page by a numeric field.
+     *
+     * Bounded exactly as range() is: price is the only field an entity carries,
+     * and any other name is refused rather than silently ignored. An order by a
+     * field nothing carries used to leave the page in insertion order and
+     * report it as sorted.
      */
     public function sortBy(string $field, bool $descending = false): self
     {
@@ -210,13 +214,28 @@ final class QueryBuilder
         return $clone;
     }
 
+    /**
+     * Count every match instead of stopping as soon as the page is full.
+     *
+     * A paged search stops early, so the totalMatches it carries is only what
+     * the engine had counted by then - a lower bound, and one that does not
+     * look like one. This makes the count exact in the same request.
+     */
+    public function exactTotal(bool $enabled = true): self
+    {
+        $clone = clone $this;
+        $clone->exactTotal = $enabled;
+
+        return $clone;
+    }
+
     public function toRequest(): SearchQueryRequest
     {
         $request = new SearchQueryRequest();
         $request->setTenantId($this->tenantId);
-        $request->setLocationPrefix($this->locationPrefix);
         $request->setLimit($this->limit);
         $request->setOffset($this->offset);
+        $request->setExactTotal($this->exactTotal);
 
         $predicates = [];
         foreach ($this->filters as $filter) {
@@ -265,7 +284,6 @@ final class QueryBuilder
     /**
      * @return array{
      *     tenant_id: string,
-     *     location_prefix: int,
      *     limit: int,
      *     offset: int,
      *     filters: list<array{op: int, attribute: string, group: int}>,
@@ -277,9 +295,9 @@ final class QueryBuilder
     {
         return [
             'tenant_id' => $this->tenantId,
-            'location_prefix' => $this->locationPrefix,
             'limit' => $this->limit,
             'offset' => $this->offset,
+            'exact_total' => $this->exactTotal,
             'filters' => $this->filters,
             'ranges' => $this->ranges,
             'sort' => $this->sort,

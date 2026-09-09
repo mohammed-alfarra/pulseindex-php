@@ -41,8 +41,7 @@ final class ProtoSchemaTest extends TestCase
             'messages' => [
                 'IndexEntityRequest' => [
                     '1:uint64 entity_id',
-                    '2:uint64 location_prefix',
-                    '3:uint32 price',
+                    '6:map<string, int64> numbers',
                     '4:repeated string categories',
                     '5:string tenant_id',
                 ],
@@ -54,21 +53,22 @@ final class ProtoSchemaTest extends TestCase
                 'BatchDeleteEntitiesRequest' => ['1:repeated uint64 entity_ids', '2:string tenant_id'],
                 'BatchDeleteEntitiesResponse' => ['1:uint32 deleted_count'],
                 'FilterPredicate' => ['1:Operation op', '2:string attribute', '3:uint32 group'],
-                'RangePredicate' => ['1:string field', '2:uint32 min_val', '3:uint32 max_val'],
+                'RangePredicate' => ['1:string field', '2:int64 min_val', '3:int64 max_val'],
                 'SortSpec' => ['1:string field', '2:bool descending'],
                 'SearchQueryRequest' => [
-                    '1:uint64 location_prefix',
                     '2:repeated FilterPredicate filters',
                     '3:repeated RangePredicate ranges',
                     '4:uint32 limit',
                     '5:uint32 offset',
                     '6:string tenant_id',
                     '7:SortSpec sort',
+                    '8:bool exact_total',
                 ],
                 'SearchQueryResponse' => [
                     '1:repeated uint64 matched_entity_ids',
                     '2:uint32 total_matches',
                     '3:uint64 execution_time_us',
+                    '4:bool total_is_exact',
                 ],
             ],
             'enums' => [

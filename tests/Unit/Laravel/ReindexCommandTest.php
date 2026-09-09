@@ -110,7 +110,7 @@ final class ReindexCommandTest extends TestCase
 
         $pushed = [];
         $client->method('batchIndex')->willReturnCallback(function (array $e) use (&$pushed, $p): int {
-            $pushed[] = $e[0]->price;
+            $pushed[] = $e[0]->numbers['price'];
             if (count($pushed) === 1) {
                 PulseSync::withoutSyncing(fn () => $p->update(['price' => 777]));
                 \PulseIndex\Laravel\Outbox::mark($p->refresh(), 'upsert');

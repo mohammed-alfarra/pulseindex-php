@@ -17,13 +17,6 @@ use Google\Protobuf\RepeatedField;
 class SearchQueryRequest extends \Google\Protobuf\Internal\Message
 {
     /**
-     * Optional location constraint (0 = no location filter).
-     * When non-zero, only entities indexed with that location_prefix match.
-     *
-     * Generated from protobuf field <code>uint64 location_prefix = 1;</code>
-     */
-    protected $location_prefix = 0;
-    /**
      * Attribute predicates (MUST / SHOULD / MUST_NOT). Order does not affect the
      * result.
      *
@@ -62,6 +55,17 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      * Generated from protobuf field <code>.pulseindex.engine.v1.SortSpec sort = 7;</code>
      */
     protected $sort = null;
+    /**
+     * Count every match instead of stopping as soon as the page is full.
+     * A page query stops early, so the count it carries is only what the chunks
+     * it opened added up to. That is usually what a page wants, and it is much
+     * cheaper. Set this when you need the exact total alongside the page: one
+     * request instead of two, and total_is_exact comes back true.
+     * limit == 0 already implies it: a count-only request has no page to fill.
+     *
+     * Generated from protobuf field <code>bool exact_total = 8;</code>
+     */
+    protected $exact_total = false;
 
     /**
      * Constructor.
@@ -69,9 +73,6 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      * @param array $data {
      *     Optional. Data for populating the Message object.
      *
-     *     @type int|string $location_prefix
-     *           Optional location constraint (0 = no location filter).
-     *           When non-zero, only entities indexed with that location_prefix match.
      *     @type \PulseIndex\Engine\V1\FilterPredicate[] $filters
      *           Attribute predicates (MUST / SHOULD / MUST_NOT). Order does not affect the
      *           result.
@@ -87,40 +88,19 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      *           Tenant / namespace to search. Empty → "default".
      *     @type \PulseIndex\Engine\V1\SortSpec $sort
      *           Optional ordering. Absent returns matches in entity-id order.
+     *     @type bool $exact_total
+     *           Count every match instead of stopping as soon as the page is full.
+     *           A page query stops early, so the count it carries is only what the chunks
+     *           it opened added up to. That is usually what a page wants, and it is much
+     *           cheaper. Set this when you need the exact total alongside the page: one
+     *           request instead of two, and total_is_exact comes back true.
+     *           limit == 0 already implies it: a count-only request has no page to fill.
      * }
      */
     public function __construct($data = null)
     {
         \GPBMetadata\PulseIndex\Engine::initOnce();
         parent::__construct($data);
-    }
-
-    /**
-     * Optional location constraint (0 = no location filter).
-     * When non-zero, only entities indexed with that location_prefix match.
-     *
-     * Generated from protobuf field <code>uint64 location_prefix = 1;</code>
-     * @return int|string
-     */
-    public function getLocationPrefix()
-    {
-        return $this->location_prefix;
-    }
-
-    /**
-     * Optional location constraint (0 = no location filter).
-     * When non-zero, only entities indexed with that location_prefix match.
-     *
-     * Generated from protobuf field <code>uint64 location_prefix = 1;</code>
-     * @param int|string $var
-     * @return $this
-     */
-    public function setLocationPrefix(int|string $var)
-    {
-        GPBUtil::checkUint64($var);
-        $this->location_prefix = $var;
-
-        return $this;
     }
 
     /**
@@ -290,6 +270,41 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
     public function setSort(\PulseIndex\Engine\V1\SortSpec|null $var)
     {
         $this->sort = $var;
+
+        return $this;
+    }
+
+    /**
+     * Count every match instead of stopping as soon as the page is full.
+     * A page query stops early, so the count it carries is only what the chunks
+     * it opened added up to. That is usually what a page wants, and it is much
+     * cheaper. Set this when you need the exact total alongside the page: one
+     * request instead of two, and total_is_exact comes back true.
+     * limit == 0 already implies it: a count-only request has no page to fill.
+     *
+     * Generated from protobuf field <code>bool exact_total = 8;</code>
+     * @return bool
+     */
+    public function getExactTotal()
+    {
+        return $this->exact_total;
+    }
+
+    /**
+     * Count every match instead of stopping as soon as the page is full.
+     * A page query stops early, so the count it carries is only what the chunks
+     * it opened added up to. That is usually what a page wants, and it is much
+     * cheaper. Set this when you need the exact total alongside the page: one
+     * request instead of two, and total_is_exact comes back true.
+     * limit == 0 already implies it: a count-only request has no page to fill.
+     *
+     * Generated from protobuf field <code>bool exact_total = 8;</code>
+     * @param bool $var
+     * @return $this
+     */
+    public function setExactTotal(bool $var)
+    {
+        $this->exact_total = $var;
 
         return $this;
     }
