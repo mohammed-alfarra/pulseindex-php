@@ -19,6 +19,11 @@ Degrees go on the wire and the engine packs them: a representation split between
 this package and the engine, with nothing comparing the two, is how the geo
 defects in 4.0.0 happened.
 
+`withinRadius()` takes the field as a fifth argument, so the cells and the
+circle go together in the call you already had. The TypeScript SDK took it from
+the start and this one did not, which is the kind of gap that exists only
+because nothing compares the two.
+
 `nearest('where', lat, lon)` orders by distance, nearest first. That was not a
 question you could ask before at any price. It needs no radius guessed to make
 it quick, and combines with every other filter, so "the closest ten available

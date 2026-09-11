@@ -124,11 +124,30 @@ final class QueryBuilder
      *
      * When $precision is omitted, {@see GeoHash::optimalPrecisionForRadius()} is used.
      */
-    public function withinRadius(float $lat, float $lon, float $radiusKm, ?int $precision = null): self
-    {
+    /**
+     * @param string|null $field The position field, as named in Entity::points.
+     *                           Given one, the cells narrow which parts of the
+     *                           index are opened and the engine measures the
+     *                           true distance, so the answer holds only what is
+     *                           really inside the circle. Without it the cells
+     *                           are the whole answer, and a union of cells is a
+     *                           superset: measured against the demo's own
+     *                           PostgreSQL comparison at 5 km, 44 rows came
+     *                           back where 26 were inside.
+     */
+    public function withinRadius(
+        float $lat,
+        float $lon,
+        float $radiusKm,
+        ?int $precision = null,
+        ?string $field = null,
+    ): self {
         $clone = clone $this;
         $group = $clone->nextGroup;
         $clone->nextGroup++;
+        if ($field !== null && trim($field) !== '') {
+            $clone->geo = ['field' => $field, 'lat' => $lat, 'lon' => $lon, 'radiusKm' => $radiusKm];
+        }
         foreach (GeoHash::getCoveringHashes($lat, $lon, $radiusKm, $precision) as $hash) {
             $clone->filters[] = [
                 'op' => Operation::SHOULD,

@@ -316,4 +316,45 @@ final class QueryBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         Entity::fromArray(['entity_id' => 1, 'points' => ['where' => ['lat' => 91.0, 'lon' => 0.0]]]);
     }
+
+    /**
+     * The cells narrow and the circle settles the edge. Without a field the
+     * cells are the whole answer, and a union of cells is a superset: measured
+     * against the demo's own PostgreSQL comparison at 5 km, 44 rows came back
+     * where 26 were inside.
+     */
+    public function testWithinRadiusAddsTheExactCircleWhenGivenAField(): void
+    {
+        $withField = (new QueryBuilder())
+            ->withinRadius(41.0369, 28.985, 2.0, null, 'where')
+            ->toRequest();
+
+        $geo = $withField->getGeo();
+        self::assertNotNull($geo, 'a field means the engine measures, not just the cells');
+        self::assertSame('where', $geo->getField());
+        self::assertEqualsWithDelta(2.0, $geo->getRadiusKm(), 1e-9);
+        self::assertGreaterThan(0, count($withField->getFilters()), 'the cells are still sent');
+
+        // And without one, nothing changes from how it always behaved.
+        $withoutField = (new QueryBuilder())
+            ->withinRadius(41.0369, 28.985, 2.0)
+            ->toRequest();
+
+        self::assertNull($withoutField->getGeo());
+        self::assertSame(
+            count($withField->getFilters()),
+            count($withoutField->getFilters()),
+            'the covering is the same either way',
+        );
+    }
+
+    /**
+     * Both SDKs are two implementations of one contract, and this one lacked
+     * the field parameter the TypeScript one already took.
+     */
+    public function testWithinRadiusIgnoresABlankField(): void
+    {
+        $request = (new QueryBuilder())->withinRadius(41.0, 29.0, 1.0, null, '   ')->toRequest();
+        self::assertNull($request->getGeo());
+    }
 }
