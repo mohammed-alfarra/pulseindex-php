@@ -101,6 +101,35 @@ trait PulseSearchable
      *
      * @return array<string, int>
      */
+    /**
+     * The model's positions, under your own names.
+     *
+     * Return `['points' => ['where' => ['lat' => ..., 'lon' => ...]]]` from
+     * `toPulseSearchableArray()`. The latitude and longitude the geohash tags
+     * are built from are left alone: those narrow which parts of the index are
+     * opened, and this is what lets the engine measure the real distance.
+     *
+     * @return array<string, array{lat: float, lon: float}>
+     */
+    public function pulsePoints(): array
+    {
+        $data = $this->toPulseSearchableArray();
+
+        /** @var array<string, array<string, float|string>> $points */
+        $points = $data['points'] ?? [];
+
+        $out = [];
+        foreach ($points as $name => $point) {
+            $lat = $point['lat'] ?? $point['latitude'] ?? null;
+            $lon = $point['lon'] ?? $point['lng'] ?? $point['longitude'] ?? null;
+            if (is_numeric($lat) && is_numeric($lon)) {
+                $out[(string) $name] = ['lat' => (float) $lat, 'lon' => (float) $lon];
+            }
+        }
+
+        return $out;
+    }
+
     public function pulseNumbers(): array
     {
         $data = $this->toPulseSearchableArray();
@@ -195,6 +224,7 @@ trait PulseSearchable
             $this->getKeyName(),
             'id',
             'numbers',
+            'points',
             'tenant_id',
             'tenantId',
             'latitude',
@@ -261,6 +291,7 @@ trait PulseSearchable
             entityId: $this->getPulseEntityId(),
             categories: $this->pulseCategories(),
             numbers: $this->pulseNumbers(),
+            points: $this->pulsePoints(),
             tenantId: $this->pulseTenantId(),
         );
     }

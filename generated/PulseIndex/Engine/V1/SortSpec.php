@@ -10,14 +10,6 @@ use Google\Protobuf\Internal\GPBUtil;
 use Google\Protobuf\RepeatedField;
 
 /**
- * SortSpec orders a page by a numeric field.
- * Without it, results come back in entity-id order. Entities carrying no value
- * for the field sort last in both directions; they are still counted in
- * total_matches, they simply have nothing to be ordered by.
- * An ordered search cannot stop early, because the best remaining row may be
- * anywhere in the tenant, so it costs more than the same filter unordered.
- * offset + limit is capped at 100,000.
- *
  * Generated from protobuf message <code>pulseindex.engine.v1.SortSpec</code>
  */
 class SortSpec extends \Google\Protobuf\Internal\Message
@@ -32,11 +24,25 @@ class SortSpec extends \Google\Protobuf\Internal\Message
      */
     protected $field = '';
     /**
-     * Largest first when true; smallest first otherwise.
+     * Largest first when true; smallest first otherwise. With by_distance,
+     * false is nearest-first.
      *
      * Generated from protobuf field <code>bool descending = 2;</code>
      */
     protected $descending = false;
+    /**
+     * Order by distance from GeoPredicate's point rather than by a field value.
+     * `field` is ignored and the geo predicate must be present. This is what
+     * makes "the nearest fifty" a question you can ask: a radius used to return
+     * everything inside it, unordered, so you had to hydrate every id from your
+     * own store before you could sort them.
+     * Ordering is to the centimetre, which is the precision a stored position
+     * has. Rows closer together than that tie, and a tie breaks on the entity id
+     * so the same query returns the same page.
+     *
+     * Generated from protobuf field <code>bool by_distance = 3;</code>
+     */
+    protected $by_distance = false;
 
     /**
      * Constructor.
@@ -50,7 +56,17 @@ class SortSpec extends \Google\Protobuf\Internal\Message
      *           An order by one used to leave the page in insertion order and call it
      *           sorted.
      *     @type bool $descending
-     *           Largest first when true; smallest first otherwise.
+     *           Largest first when true; smallest first otherwise. With by_distance,
+     *           false is nearest-first.
+     *     @type bool $by_distance
+     *           Order by distance from GeoPredicate's point rather than by a field value.
+     *           `field` is ignored and the geo predicate must be present. This is what
+     *           makes "the nearest fifty" a question you can ask: a radius used to return
+     *           everything inside it, unordered, so you had to hydrate every id from your
+     *           own store before you could sort them.
+     *           Ordering is to the centimetre, which is the precision a stored position
+     *           has. Rows closer together than that tie, and a tie breaks on the entity id
+     *           so the same query returns the same page.
      * }
      */
     public function __construct($data = null)
@@ -92,7 +108,8 @@ class SortSpec extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Largest first when true; smallest first otherwise.
+     * Largest first when true; smallest first otherwise. With by_distance,
+     * false is nearest-first.
      *
      * Generated from protobuf field <code>bool descending = 2;</code>
      * @return bool
@@ -103,7 +120,8 @@ class SortSpec extends \Google\Protobuf\Internal\Message
     }
 
     /**
-     * Largest first when true; smallest first otherwise.
+     * Largest first when true; smallest first otherwise. With by_distance,
+     * false is nearest-first.
      *
      * Generated from protobuf field <code>bool descending = 2;</code>
      * @param bool $var
@@ -112,6 +130,45 @@ class SortSpec extends \Google\Protobuf\Internal\Message
     public function setDescending(bool $var)
     {
         $this->descending = $var;
+
+        return $this;
+    }
+
+    /**
+     * Order by distance from GeoPredicate's point rather than by a field value.
+     * `field` is ignored and the geo predicate must be present. This is what
+     * makes "the nearest fifty" a question you can ask: a radius used to return
+     * everything inside it, unordered, so you had to hydrate every id from your
+     * own store before you could sort them.
+     * Ordering is to the centimetre, which is the precision a stored position
+     * has. Rows closer together than that tie, and a tie breaks on the entity id
+     * so the same query returns the same page.
+     *
+     * Generated from protobuf field <code>bool by_distance = 3;</code>
+     * @return bool
+     */
+    public function getByDistance()
+    {
+        return $this->by_distance;
+    }
+
+    /**
+     * Order by distance from GeoPredicate's point rather than by a field value.
+     * `field` is ignored and the geo predicate must be present. This is what
+     * makes "the nearest fifty" a question you can ask: a radius used to return
+     * everything inside it, unordered, so you had to hydrate every id from your
+     * own store before you could sort them.
+     * Ordering is to the centimetre, which is the precision a stored position
+     * has. Rows closer together than that tie, and a tie breaks on the entity id
+     * so the same query returns the same page.
+     *
+     * Generated from protobuf field <code>bool by_distance = 3;</code>
+     * @param bool $var
+     * @return $this
+     */
+    public function setByDistance(bool $var)
+    {
+        $this->by_distance = $var;
 
         return $this;
     }

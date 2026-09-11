@@ -80,6 +80,20 @@ message IndexEntityRequest {
   // with no negatives and nothing past 4,294,967,295.
   map<string, int64> numbers = 6;
 
+  // Positions, under your own names, the same way `numbers` are.
+  //
+  // The engine packs the pair into one number and keeps it in an ordinary
+  // column, so a position costs what a number costs. Send degrees and let it
+  // pack: a representation split between this SDK and the engine, with nothing
+  // comparing the two, is how the geo bugs in 4.0.0 happened - one side
+  // computes it differently and every answer is a plausible empty page.
+  //
+  //   points: { "where": { lat: 41.0369, lon: 28.9850 } }
+  //
+  // A name used here and in `numbers` on the same record is refused: a field
+  // is either a number or a position.
+  map<string, GeoPoint> points = 7;
+
   // Attribute tokens already namespaced by the client, e.g.:
   //   "feature:pool", "furnishing:full", "amenity:parking"
   // Tokens are matched exactly; they are never stored as readable text.
@@ -91,6 +105,12 @@ message IndexEntityRequest {
 }
 
 // IndexEntityResponse acknowledges a successful upsert.
+// GeoPoint is one position in degrees.
+message GeoPoint {
+  double lat = 1;
+  double lon = 2;
+}
+
 message IndexEntityResponse {
   // True when the entity was accepted into the index.
   // Capacity violations return gRPC RESOURCE_EXHAUSTED instead.
@@ -209,6 +229,25 @@ message RangePredicate {
 // An ordered search cannot stop early, because the best remaining row may be
 // anywhere in the tenant, so it costs more than the same filter unordered.
 // offset + limit is capped at 100,000.
+// GeoPredicate names a position field and a point to measure from.
+//
+// A circle used to reach the engine only as a union of geohash cells this SDK
+// generated, and a union of cells is a superset of the circle: measured at a
+// million entities, a 1 km search returned 2,479 rows where 1,241 were really
+// inside. The cells are still the cheap way to narrow which parts of the index
+// are opened; this is what settles the edge.
+message GeoPredicate {
+  // The position field, named as you named it in IndexEntityRequest.points.
+  string field = 1;
+
+  double lat = 2;
+  double lon = 3;
+
+  // Inclusive radius in kilometres. Zero means no radius filter at all: the
+  // point is then only an origin to measure from, for SortSpec.by_distance.
+  double radius_km = 4;
+}
+
 message SortSpec {
   // Numeric field name, the same one a RangePredicate would name, and bounded
   // the same way: a name no entity carries is refused, not silently ignored.
@@ -216,8 +255,21 @@ message SortSpec {
   // sorted.
   string field = 1;
 
-  // Largest first when true; smallest first otherwise.
+  // Largest first when true; smallest first otherwise. With by_distance,
+  // false is nearest-first.
   bool descending = 2;
+
+  // Order by distance from GeoPredicate's point rather than by a field value.
+  //
+  // `field` is ignored and the geo predicate must be present. This is what
+  // makes "the nearest fifty" a question you can ask: a radius used to return
+  // everything inside it, unordered, so you had to hydrate every id from your
+  // own store before you could sort them.
+  //
+  // Ordering is to the centimetre, which is the precision a stored position
+  // has. Rows closer together than that tie, and a tie breaks on the entity id
+  // so the same query returns the same page.
+  bool by_distance = 3;
 }
 
 // ---------------------------------------------------------------------------
@@ -259,6 +311,9 @@ message SearchQueryRequest {
   //
   // limit == 0 already implies it: a count-only request has no page to fill.
   bool exact_total = 8;
+
+  // Optional circle, and the position field to measure against.
+  GeoPredicate geo = 9;
 }
 
 // SearchQueryResponse returns matched ids and timing metadata.

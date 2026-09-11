@@ -15,6 +15,7 @@ interface ClientInterface
         int $entityId,
         array $categories = [],
         array $numbers = [],
+        array $points = [],
         string $tenantId = '',
     ): bool;
 

@@ -42,6 +42,7 @@ final class ProtoSchemaTest extends TestCase
                 'IndexEntityRequest' => [
                     '1:uint64 entity_id',
                     '6:map<string, int64> numbers',
+                    '7:map<string, GeoPoint> points',
                     '4:repeated string categories',
                     '5:string tenant_id',
                 ],
@@ -54,7 +55,14 @@ final class ProtoSchemaTest extends TestCase
                 'BatchDeleteEntitiesResponse' => ['1:uint32 deleted_count'],
                 'FilterPredicate' => ['1:Operation op', '2:string attribute', '3:uint32 group'],
                 'RangePredicate' => ['1:string field', '2:int64 min_val', '3:int64 max_val'],
-                'SortSpec' => ['1:string field', '2:bool descending'],
+                'GeoPoint' => ['1:double lat', '2:double lon'],
+                'GeoPredicate' => [
+                    '1:string field',
+                    '2:double lat',
+                    '3:double lon',
+                    '4:double radius_km',
+                ],
+                'SortSpec' => ['1:string field', '2:bool descending', '3:bool by_distance'],
                 'SearchQueryRequest' => [
                     '2:repeated FilterPredicate filters',
                     '3:repeated RangePredicate ranges',
@@ -63,6 +71,7 @@ final class ProtoSchemaTest extends TestCase
                     '6:string tenant_id',
                     '7:SortSpec sort',
                     '8:bool exact_total',
+                    '9:GeoPredicate geo',
                 ],
                 'SearchQueryResponse' => [
                     '1:repeated uint64 matched_entity_ids',

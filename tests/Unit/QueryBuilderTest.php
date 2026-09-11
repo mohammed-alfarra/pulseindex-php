@@ -7,6 +7,7 @@ namespace PulseIndex\Tests\Unit;
 use PHPUnit\Framework\TestCase;
 use PulseIndex\Engine\V1\FilterPredicate\Operation;
 use PulseIndex\Entity;
+use PulseIndex\Exception\PulseIndexException;
 use PulseIndex\Geo\GeoHash;
 use PulseIndex\QueryBuilder;
 
@@ -265,5 +266,54 @@ final class QueryBuilderTest extends TestCase
         self::assertNotNull($withSort->toArray()['sort']);
         self::assertCount(1, $base->toArray()['filters']);
         self::assertGreaterThan(1, count($withRadius->toArray()['filters']));
+    }
+
+    public function testCarriesACircleAndAnOrderByDistance(): void
+    {
+        $request = (new QueryBuilder())
+            ->tenant('acme')
+            ->must('kind:driver')
+            ->within('where', 41.0369, 28.985, 3.0)
+            ->nearest('where', 41.0369, 28.985)
+            ->toRequest();
+
+        $geo = $request->getGeo();
+        self::assertNotNull($geo);
+        self::assertSame('where', $geo->getField());
+        self::assertEqualsWithDelta(41.0369, $geo->getLat(), 1e-9);
+        self::assertEqualsWithDelta(3.0, $geo->getRadiusKm(), 1e-9);
+        self::assertTrue($request->getSort()->getByDistance());
+    }
+
+    public function testNearestKeepsARadiusThatWasAlreadySet(): void
+    {
+        $request = (new QueryBuilder())
+            ->within('where', 41.0, 29.0, 7.5)
+            ->nearest('where', 41.0, 29.0)
+            ->toRequest();
+
+        self::assertEqualsWithDelta(7.5, $request->getGeo()->getRadiusKm(), 1e-9);
+    }
+
+    public function testRefusesACircleItCannotMeasure(): void
+    {
+        $this->expectException(PulseIndexException::class);
+        (new QueryBuilder())->within('where', 41.0, 29.0, -1.0);
+    }
+
+    public function testAPositionIsNormalisedFromEitherSpelling(): void
+    {
+        $entity = Entity::fromArray([
+            'entity_id' => 5,
+            'points' => ['where' => ['latitude' => '41.5', 'lng' => '28.5']],
+        ]);
+
+        self::assertSame(['where' => ['lat' => 41.5, 'lon' => 28.5]], $entity->points);
+    }
+
+    public function testAPositionOffTheGlobeIsRefused(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        Entity::fromArray(['entity_id' => 1, 'points' => ['where' => ['lat' => 91.0, 'lon' => 0.0]]]);
     }
 }

@@ -13,7 +13,7 @@ use PulseIndex\SearchResult;
 
 /**
  * @method static QueryBuilder query()
- * @method static bool indexEntity(int $entityId, array $categories = [], array $numbers = [], string $tenantId = '')
+ * @method static bool indexEntity(int $entityId, array $categories = [], array $numbers = [], array $points = [], string $tenantId = '')
  * @method static bool index(Entity $entity)
  * @method static int batchIndex(array $entities)
  * @method static bool deleteEntity(int $entityId, string $tenantId = '')

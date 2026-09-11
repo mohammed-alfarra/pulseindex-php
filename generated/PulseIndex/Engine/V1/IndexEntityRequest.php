@@ -39,6 +39,20 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
      */
     private $numbers;
     /**
+     * Positions, under your own names, the same way `numbers` are.
+     * The engine packs the pair into one number and keeps it in an ordinary
+     * column, so a position costs what a number costs. Send degrees and let it
+     * pack: a representation split between this SDK and the engine, with nothing
+     * comparing the two, is how the geo bugs in 4.0.0 happened - one side
+     * computes it differently and every answer is a plausible empty page.
+     *   points: { "where": { lat: 41.0369, lon: 28.9850 } }
+     * A name used here and in `numbers` on the same record is refused: a field
+     * is either a number or a position.
+     *
+     * Generated from protobuf field <code>map<string, .pulseindex.engine.v1.GeoPoint> points = 7;</code>
+     */
+    private $points;
+    /**
      * Attribute tokens already namespaced by the client, e.g.:
      *   "feature:pool", "furnishing:full", "amenity:parking"
      * Tokens are matched exactly; they are never stored as readable text.
@@ -72,6 +86,16 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
      *           This replaces a single uint32 named `price` and a uint64 bitfield named
      *           `location_prefix` — one number per record, under a name the engine chose,
      *           with no negatives and nothing past 4,294,967,295.
+     *     @type array|\Google\Protobuf\Internal\MapField $points
+     *           Positions, under your own names, the same way `numbers` are.
+     *           The engine packs the pair into one number and keeps it in an ordinary
+     *           column, so a position costs what a number costs. Send degrees and let it
+     *           pack: a representation split between this SDK and the engine, with nothing
+     *           comparing the two, is how the geo bugs in 4.0.0 happened - one side
+     *           computes it differently and every answer is a plausible empty page.
+     *             points: { "where": { lat: 41.0369, lon: 28.9850 } }
+     *           A name used here and in `numbers` on the same record is refused: a field
+     *           is either a number or a position.
      *     @type string[] $categories
      *           Attribute tokens already namespaced by the client, e.g.:
      *             "feature:pool", "furnishing:full", "amenity:parking"
@@ -151,6 +175,48 @@ class IndexEntityRequest extends \Google\Protobuf\Internal\Message
     {
         $arr = GPBUtil::checkMapField($var, \Google\Protobuf\Internal\GPBType::STRING, \Google\Protobuf\Internal\GPBType::INT64);
         $this->numbers = $arr;
+
+        return $this;
+    }
+
+    /**
+     * Positions, under your own names, the same way `numbers` are.
+     * The engine packs the pair into one number and keeps it in an ordinary
+     * column, so a position costs what a number costs. Send degrees and let it
+     * pack: a representation split between this SDK and the engine, with nothing
+     * comparing the two, is how the geo bugs in 4.0.0 happened - one side
+     * computes it differently and every answer is a plausible empty page.
+     *   points: { "where": { lat: 41.0369, lon: 28.9850 } }
+     * A name used here and in `numbers` on the same record is refused: a field
+     * is either a number or a position.
+     *
+     * Generated from protobuf field <code>map<string, .pulseindex.engine.v1.GeoPoint> points = 7;</code>
+     * @return \Google\Protobuf\Internal\MapField
+     */
+    public function getPoints()
+    {
+        return $this->points;
+    }
+
+    /**
+     * Positions, under your own names, the same way `numbers` are.
+     * The engine packs the pair into one number and keeps it in an ordinary
+     * column, so a position costs what a number costs. Send degrees and let it
+     * pack: a representation split between this SDK and the engine, with nothing
+     * comparing the two, is how the geo bugs in 4.0.0 happened - one side
+     * computes it differently and every answer is a plausible empty page.
+     *   points: { "where": { lat: 41.0369, lon: 28.9850 } }
+     * A name used here and in `numbers` on the same record is refused: a field
+     * is either a number or a position.
+     *
+     * Generated from protobuf field <code>map<string, .pulseindex.engine.v1.GeoPoint> points = 7;</code>
+     * @param array|\Google\Protobuf\Internal\MapField $var
+     * @return $this
+     */
+    public function setPoints(array|\Google\Protobuf\Internal\MapField $var)
+    {
+        $arr = GPBUtil::checkMapField($var, \Google\Protobuf\Internal\GPBType::STRING, \Google\Protobuf\Internal\GPBType::MESSAGE, \PulseIndex\Engine\V1\GeoPoint::class);
+        $this->points = $arr;
 
         return $this;
     }

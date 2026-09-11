@@ -8,6 +8,8 @@ use PulseIndex\Engine\V1\FilterPredicate;
 use PulseIndex\Engine\V1\FilterPredicate\Operation;
 use PulseIndex\Engine\V1\RangePredicate;
 use PulseIndex\Engine\V1\SearchQueryRequest;
+use PulseIndex\Engine\V1\GeoPredicate;
+use PulseIndex\Exception\PulseIndexException;
 use PulseIndex\Engine\V1\SortSpec;
 use PulseIndex\Geo\GeoHash;
 
@@ -33,6 +35,9 @@ final class QueryBuilder
     private int $offset = 0;
 
     private bool $exactTotal = false;
+
+    /** @var array{field: string, lat: float, lon: float, radiusKm: float}|null */
+    private ?array $geo = null;
 
     /** @var list<array{op: int, attribute: string, group: int}> */
     private array $filters = [];
@@ -229,6 +234,52 @@ final class QueryBuilder
         return $clone;
     }
 
+    /**
+     * Keep only entities within $radiusKm of the point, measured exactly.
+     *
+     * This is the circle on its own. withinRadius() with a field adds the
+     * geohash cells too, which is what stops the engine opening every part of
+     * the index to find them.
+     */
+    public function within(string $field, float $lat, float $lon, float $radiusKm): self
+    {
+        if (trim($field) === '') {
+            throw new PulseIndexException('A position field name must not be empty.');
+        }
+        if ($radiusKm < 0.0) {
+            throw new PulseIndexException(sprintf('A circle cannot have a radius of %s.', $radiusKm));
+        }
+        $clone = clone $this;
+        $clone->geo = ['field' => $field, 'lat' => $lat, 'lon' => $lon, 'radiusKm' => $radiusKm];
+
+        return $clone;
+    }
+
+    /**
+     * Order the page by distance from the point, nearest first.
+     *
+     * Without a radius this is "the nearest K of whatever else matched".
+     * It used to be impossible: a radius returned everything inside it
+     * unordered, so you hydrated every id from your own store before you could
+     * sort them.
+     */
+    public function nearest(string $field, float $lat, float $lon): self
+    {
+        if (trim($field) === '') {
+            throw new PulseIndexException('A position field name must not be empty.');
+        }
+        $clone = clone $this;
+        $clone->geo = [
+            'field' => $field,
+            'lat' => $lat,
+            'lon' => $lon,
+            'radiusKm' => $this->geo['radiusKm'] ?? 0.0,
+        ];
+        $clone->sort = ['field' => $field, 'descending' => false, 'byDistance' => true];
+
+        return $clone;
+    }
+
     public function toRequest(): SearchQueryRequest
     {
         $request = new SearchQueryRequest();
@@ -261,7 +312,17 @@ final class QueryBuilder
             $sort = new SortSpec();
             $sort->setField($this->sort['field']);
             $sort->setDescending($this->sort['descending']);
+            $sort->setByDistance($this->sort['byDistance'] ?? false);
             $request->setSort($sort);
+        }
+
+        if ($this->geo !== null) {
+            $geo = new GeoPredicate();
+            $geo->setField($this->geo['field']);
+            $geo->setLat($this->geo['lat']);
+            $geo->setLon($this->geo['lon']);
+            $geo->setRadiusKm($this->geo['radiusKm']);
+            $request->setGeo($geo);
         }
 
         return $request;
@@ -298,6 +359,7 @@ final class QueryBuilder
             'limit' => $this->limit,
             'offset' => $this->offset,
             'exact_total' => $this->exactTotal,
+            'geo' => $this->geo,
             'filters' => $this->filters,
             'ranges' => $this->ranges,
             'sort' => $this->sort,

@@ -10,8 +10,6 @@ use Google\Protobuf\Internal\GPBUtil;
 use Google\Protobuf\RepeatedField;
 
 /**
- * IndexEntityResponse acknowledges a successful upsert.
- *
  * Generated from protobuf message <code>pulseindex.engine.v1.IndexEntityResponse</code>
  */
 class IndexEntityResponse extends \Google\Protobuf\Internal\Message

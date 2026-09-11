@@ -8,6 +8,7 @@ use Grpc\ChannelCredentials;
 use PulseIndex\Engine\V1\BatchDeleteEntitiesRequest;
 use PulseIndex\Engine\V1\BatchIndexEntitiesRequest;
 use PulseIndex\Engine\V1\DeleteEntityRequest;
+use PulseIndex\Engine\V1\GeoPoint;
 use Grpc\Health\V1\HealthCheckRequest;
 use Grpc\Health\V1\HealthCheckResponse\ServingStatus;
 use Grpc\Health\V1\HealthClient;
@@ -183,12 +184,14 @@ final class Client implements ClientInterface
         int $entityId,
         array $categories = [],
         array $numbers = [],
+        array $points = [],
         string $tenantId = '',
     ): bool {
         $request = new IndexEntityRequest();
         $request->setEntityId($entityId);
         $request->setCategories(array_values($categories));
         $request->setNumbers($numbers);
+        $request->setPoints(self::geoPoints($points));
         $request->setTenantId($tenantId);
 
         /** @var \PulseIndex\Engine\V1\IndexEntityResponse $response */
@@ -197,12 +200,33 @@ final class Client implements ClientInterface
         return (bool) $response->getSuccess();
     }
 
+    /**
+     * Degrees onto the wire. The engine packs them, so there is one
+     * representation and one place that knows it.
+     *
+     * @param  array<string, array{lat: float, lon: float}> $points
+     * @return array<string, GeoPoint>
+     */
+    private static function geoPoints(array $points): array
+    {
+        $out = [];
+        foreach ($points as $name => $point) {
+            $message = new GeoPoint();
+            $message->setLat((float) $point['lat']);
+            $message->setLon((float) $point['lon']);
+            $out[(string) $name] = $message;
+        }
+
+        return $out;
+    }
+
     public function index(Entity $entity): bool
     {
         return $this->indexEntity(
             $entity->entityId,
             $entity->categories,
             $entity->numbers,
+            $entity->points,
             $entity->tenantId,
         );
     }
@@ -225,6 +249,7 @@ final class Client implements ClientInterface
             $request->setEntityId($entity->entityId);
             $request->setCategories($entity->categories);
             $request->setNumbers($entity->numbers);
+            $request->setPoints(self::geoPoints($entity->points));
             $request->setTenantId($entity->tenantId);
             $messages[] = $request;
         }

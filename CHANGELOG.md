@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### A radius that means what it says, and "the nearest K"
+
+A circle used to be a union of geohash cells, and a union of cells is a superset
+of the circle. Measured against a million entities, a 1 km search returned
+**2,479** rows where **1,241** were really inside — and nothing in the answer
+said which. You hydrated all 2,479 from your own store and measured them again.
+
+Send a position with the record and the engine settles the edge itself:
+
+    points: { where: { lat: 41.0369, lon: 28.9850 } }
+
+Then `withinRadius({ ..., field: 'where' })` narrows on the cells and measures
+the true distance, or `within('where', lat, lon, km)` measures without them.
+Degrees go on the wire and the engine packs them: a representation split between
+this package and the engine, with nothing comparing the two, is how the geo
+defects in 4.0.0 happened.
+
+`nearest('where', lat, lon)` orders by distance, nearest first. That was not a
+question you could ask before at any price. It needs no radius guessed to make
+it quick, and combines with every other filter, so "the closest ten available
+drivers with room" is one request.
+
+Ordering is to the centimetre, which is the precision a stored position has.
+
+
 ### The result count now says whether it is the whole count
 
 A paged search stops as soon as the page is full, so the `totalMatches` it

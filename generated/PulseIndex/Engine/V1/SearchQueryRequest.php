@@ -66,6 +66,12 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      * Generated from protobuf field <code>bool exact_total = 8;</code>
      */
     protected $exact_total = false;
+    /**
+     * Optional circle, and the position field to measure against.
+     *
+     * Generated from protobuf field <code>.pulseindex.engine.v1.GeoPredicate geo = 9;</code>
+     */
+    protected $geo = null;
 
     /**
      * Constructor.
@@ -95,6 +101,8 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
      *           cheaper. Set this when you need the exact total alongside the page: one
      *           request instead of two, and total_is_exact comes back true.
      *           limit == 0 already implies it: a count-only request has no page to fill.
+     *     @type \PulseIndex\Engine\V1\GeoPredicate $geo
+     *           Optional circle, and the position field to measure against.
      * }
      */
     public function __construct($data = null)
@@ -305,6 +313,41 @@ class SearchQueryRequest extends \Google\Protobuf\Internal\Message
     public function setExactTotal(bool $var)
     {
         $this->exact_total = $var;
+
+        return $this;
+    }
+
+    /**
+     * Optional circle, and the position field to measure against.
+     *
+     * Generated from protobuf field <code>.pulseindex.engine.v1.GeoPredicate geo = 9;</code>
+     * @return \PulseIndex\Engine\V1\GeoPredicate|null
+     */
+    public function getGeo()
+    {
+        return $this->geo;
+    }
+
+    public function hasGeo()
+    {
+        return isset($this->geo);
+    }
+
+    public function clearGeo()
+    {
+        unset($this->geo);
+    }
+
+    /**
+     * Optional circle, and the position field to measure against.
+     *
+     * Generated from protobuf field <code>.pulseindex.engine.v1.GeoPredicate geo = 9;</code>
+     * @param \PulseIndex\Engine\V1\GeoPredicate $var
+     * @return $this
+     */
+    public function setGeo(\PulseIndex\Engine\V1\GeoPredicate|null $var)
+    {
+        $this->geo = $var;
 
         return $this;
     }
