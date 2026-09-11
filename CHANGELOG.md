@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 5.0.0
+
+Needs a PulseIndex engine at v2.0.0 or later. The wire contract is a
+breaking change: an SDK at 4.x cannot talk to a v2 engine, and this cannot
+talk to a v1 one.
 
 ### A radius that means what it says, and "the nearest K"
 
