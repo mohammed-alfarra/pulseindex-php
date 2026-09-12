@@ -43,6 +43,8 @@ final class Entity
      */
     public static function fromArray(array $data): self
     {
+        self::assertNoUnknownKeys($data);
+
         return new self(
             entityId: (int) ($data['entity_id'] ?? $data['entityId'] ?? 0),
             categories: array_values($data['categories'] ?? []),
@@ -50,6 +52,74 @@ final class Entity
             points: self::normalisePoints($data['points'] ?? []),
             tenantId: (string) ($data['tenant_id'] ?? $data['tenantId'] ?? ''),
         );
+    }
+
+    /**
+     * Every key this accepts, so a typo is a refusal rather than a silence.
+     *
+     * @var list<string>
+     */
+    private const KNOWN_KEYS = [
+        'entity_id', 'entityId',
+        'categories',
+        'numbers',
+        'points',
+        'tenant_id', 'tenantId',
+    ];
+
+    /**
+     * Where a key that used to mean something now goes.
+     *
+     * @var array<string, string>
+     */
+    private const MOVED_KEYS = [
+        'price' => "numbers, under your own name: ['numbers' => ['price' => 45000]]",
+        'location_prefix' => "points, as degrees: ['points' => ['where' => ['lat' => .., 'lon' => ..]]]",
+        'locationPrefix' => "points, as degrees: ['points' => ['where' => ['lat' => .., 'lon' => ..]]]",
+        'latitude' => "points, as degrees: ['points' => ['where' => ['lat' => .., 'lon' => ..]]]",
+        'longitude' => "points, as degrees: ['points' => ['where' => ['lat' => .., 'lon' => ..]]]",
+        'lat' => "points, as degrees: ['points' => ['where' => ['lat' => .., 'lon' => ..]]]",
+        'lon' => "points, as degrees: ['points' => ['where' => ['lat' => .., 'lon' => ..]]]",
+        'lng' => "points, as degrees: ['points' => ['where' => ['lat' => .., 'lon' => ..]]]",
+        'tags' => 'categories',
+    ];
+
+    /**
+     * A key this does not read is a mistake, not a no-op.
+     *
+     * This is a DTO, not the attribute flattener the TypeScript `index()` call
+     * is - there is no rule here that turns an unrecognised key into a tag, so
+     * one could only ever be dropped. It was dropped silently until now, and
+     * `'price' => 45000` is exactly the shape that costs: it was read in 4.x,
+     * it is not read in 5.x, and the only sign was a search refusing the field
+     * later on. Measured on the real demo, that cost half an hour to attribute
+     * to the seeder rather than to the model.
+     *
+     * @param array<string, mixed> $data
+     */
+    private static function assertNoUnknownKeys(array $data): void
+    {
+        $unknown = array_diff(array_keys($data), self::KNOWN_KEYS);
+        if ($unknown === []) {
+            return;
+        }
+
+        $lines = [];
+        foreach ($unknown as $key) {
+            $key = (string) $key;
+            $lines[] = isset(self::MOVED_KEYS[$key])
+                ? sprintf('%s belongs in %s', $key, self::MOVED_KEYS[$key])
+                : sprintf('%s is not a field an entity has', $key);
+        }
+
+        throw new \InvalidArgumentException(sprintf(
+            'Entity::fromArray was given %s it does not read, so they would have been '
+            . 'dropped: %s. It reads %s. Anything else about a record is a category '
+            . 'token and belongs in categories.',
+            count($unknown) === 1 ? 'a key' : 'keys',
+            implode('; ', $lines),
+            implode(', ', self::KNOWN_KEYS),
+        ));
     }
 
     /**

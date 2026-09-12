@@ -357,4 +357,50 @@ final class QueryBuilderTest extends TestCase
         $request = (new QueryBuilder())->withinRadius(41.0, 29.0, 1.0, null, '   ')->toRequest();
         self::assertNull($request->getGeo());
     }
+
+    /**
+     * A key fromArray does not read could only ever be dropped, and dropping
+     * `price` silently is what cost half an hour on the real demo: it was read
+     * in 4.x, it is not read in 5.x, and the only sign was a search refusing
+     * the field much later.
+     */
+    public function testFromArrayRefusesAKeyItWouldHaveDropped(): void
+    {
+        try {
+            Entity::fromArray(['entity_id' => 1, 'price' => 45000]);
+            self::fail('a key that would be dropped must not be accepted');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('price', $e->getMessage());
+            self::assertStringContainsString('numbers', $e->getMessage());
+        }
+    }
+
+    public function testFromArrayNamesWhereAMovedKeyWentAndWhatItReads(): void
+    {
+        try {
+            Entity::fromArray(['entity_id' => 1, 'latitude' => 41.0, 'colour' => 'red']);
+            self::fail('expected a refusal');
+        } catch (\InvalidArgumentException $e) {
+            $m = $e->getMessage();
+            self::assertStringContainsString('latitude belongs in points', $m);
+            self::assertStringContainsString('colour is not a field an entity has', $m);
+            self::assertStringContainsString('categories', $m, 'it has to say where the rest goes');
+        }
+    }
+
+    public function testFromArrayStillAcceptsEverythingItReads(): void
+    {
+        $entity = Entity::fromArray([
+            'entity_id' => 9,
+            'categories' => ['feature:pool'],
+            'numbers' => ['price' => 45000],
+            'points' => ['where' => ['lat' => 41.0, 'lon' => 29.0]],
+            'tenantId' => 't1',
+        ]);
+
+        self::assertSame(9, $entity->entityId);
+        self::assertSame(['price' => 45000], $entity->numbers);
+        self::assertSame(['where' => ['lat' => 41.0, 'lon' => 29.0]], $entity->points);
+        self::assertSame('t1', $entity->tenantId);
+    }
 }

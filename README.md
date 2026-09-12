@@ -57,7 +57,22 @@ class Property extends Model
         return [
             'categories' => $this->tags,
             'status' => $this->status,
-            'price' => $this->price,
+
+            // Numbers you can range and order on, under your own names.
+            // There is no field the engine calls `price`.
+            'numbers' => [
+                'price' => (int) $this->price,
+                'bedrooms' => (int) $this->bedrooms,
+            ],
+
+            // A position, in degrees, so a radius is measured rather than
+            // approximated. The engine packs it.
+            'points' => [
+                'where' => ['lat' => (float) $this->latitude, 'lon' => (float) $this->longitude],
+            ],
+
+            // Still read, and still what generates the geohash tags that
+            // narrow which part of the index a radius search opens.
             'latitude' => $this->latitude,
             'longitude' => $this->longitude,
         ];
@@ -241,7 +256,8 @@ $client = Client::create('localhost:50051', 'your-api-key');
 $client->index(new Entity(
     entityId: 1001,
     categories: ['feature:pool', 'amenity:parking'],
-    price: 1500,
+    numbers: ['price' => 1500, 'bedrooms' => 3],
+    points: ['where' => ['lat' => 24.7136, 'lon' => 46.6753]],
     tenantId: 'acme',
 ));
 
@@ -250,14 +266,32 @@ $result = $client->search(
         ->tenant('acme')
         ->must('feature:pool')
         ->range('price', 1000, 5000)
-        ->withinRadius(24.7136, 46.6753, 5)
+        ->withinRadius(24.7136, 46.6753, 5, field: 'where')
         ->limit(50)
 );
 
-> **`withinRadius` is a fast pre-filter, not an exact radius.** It expands the
-> circle into geohash cells, which are rectangles, so results include some points
-> outside the radius — about 1.1x to 1.8x the circle's area. The engine stores no
-> coordinates, so filter the remainder from your own data after hydration.
+> **Name the position field and the radius is exact.** Without it, `withinRadius`
+> expands the circle into geohash cells, which are rectangles, so the cells alone
+> cover more than the circle does: measured against a million records with
+> PostgreSQL computing the same circle, a 5 km search returned **44 rows where 22
+> were really inside**. Pass `field` and the engine narrows on those cells and
+> then measures the true distance — same query, **22 rows**, agreeing with both
+> PostgreSQL and Typesense on the id set.
+
+> **`nearest()` orders by distance.** `->nearest('where', 24.7136, 46.6753)`
+> returns the closest first, drawn from whatever the other filters left, with no
+> radius to guess. Ordering is to the centimetre, which is the precision a stored
+> position has.
+
+> **Read `totalIsExact` before showing `totalMatches`.** A page stops as soon as
+> it is full, so its count is only what the scan had reached — a lower bound that
+> does not look like one. `searchWithTotal()` asks for the page and the true
+> count in one request.
+
+> **A key `Entity::fromArray()` does not read is refused.** It is a DTO, not an
+> attribute flattener, so an unrecognised key could only ever be dropped.
+> `'price' => 1500` at the top level was read in 4.x and is not read in 5.x, and
+> it now says so instead of going quiet.
 
 > **Install `ext-protobuf` if your queries carry many predicates.** The pure-PHP
 > protobuf implementation is the fallback, and it is the dominant cost once a

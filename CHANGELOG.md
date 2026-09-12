@@ -1,5 +1,33 @@
 # Changelog
 
+## 5.1.0
+
+### A key `fromArray()` does not read is refused, not dropped
+
+It is a DTO, not the attribute flattener the TypeScript `index()` call is, so
+an unrecognised key could only ever be dropped — and it was dropped in silence.
+`'price' => 45000` is exactly the shape that costs: read in 4.x, not read in
+5.x, and the only sign was a search refusing the field much later. Measured on
+a real application, that took half an hour to attribute to the seeder rather
+than to the model.
+
+It now names the key, says where a moved one went, and lists what it reads:
+
+    Entity::fromArray was given a key it does not read, so they would have been
+    dropped: price belongs in numbers, under your own name:
+    ['numbers' => ['price' => 45000]]. It reads entity_id, entityId,
+    categories, numbers, points, tenant_id, tenantId. Anything else about a
+    record is a category token and belongs in categories.
+
+**A key you pass that does nothing now throws.** That is the point, and it is
+why this is a minor rather than a patch.
+
+### The README was documenting 4.x
+
+Every indexing example showed a bare `'price'`, which 5.0.0 does not read. The
+model example, the `Entity` example and the radius note are corrected, and the
+radius, `nearest()`, `totalIsExact` and this refusal are all documented now.
+
 ## 5.0.0
 
 Needs a PulseIndex engine at v2.0.0 or later. The wire contract is a
